@@ -1,0 +1,7 @@
+{
+  "name": "Tạp Hóa Tấn Lệch",
+  "description": "Cửa hàng tạp hóa online độc lạ chỉ bán Combo. Khách hàng cần săn mã giảm giá từ AI hoặc đăng ký để mua hàng giá hời.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
