@@ -1,17 +1,16 @@
 import React from 'react';
 import { Combo } from '../types';
-import { ExternalLink, Tag, Clock, ArrowRight } from 'lucide-react';
+import { ShoppingCart, Tag, Clock, Plus } from 'lucide-react';
 
 interface Props {
   combos: Combo[];
   onOpenHunter: () => void;
+  onAddToCart: (combo: Combo) => void;
+  cartItemCount: number;
+  onOpenCart: () => void;
 }
 
-export const Shop: React.FC<Props> = ({ combos, onOpenHunter }) => {
-  const handleBuy = (link: string) => {
-    window.open(link, '_blank');
-  };
-  
+export const Shop: React.FC<Props> = ({ combos, onOpenHunter, onAddToCart, cartItemCount, onOpenCart }) => {
   return (
     <div className="min-h-screen pb-20 md:pb-0 bg-gray-50">
       {/* Sticky Header */}
@@ -19,20 +18,35 @@ export const Shop: React.FC<Props> = ({ combos, onOpenHunter }) => {
         <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-white font-black text-xl">T</div>
-            <h1 className="font-bold text-gray-800 text-lg tracking-tight">Tấn Lệch <span className="text-orange-600">Store</span></h1>
+            <h1 className="font-bold text-gray-800 text-lg tracking-tight hidden md:block">Tân Lếch <span className="text-orange-600">Đóng Gói</span></h1>
           </div>
-          <button 
-              onClick={onOpenHunter}
-              className="flex items-center gap-1 bg-yellow-100 text-orange-700 px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-yellow-200 transition"
-          >
-              <Tag size={16} /> Kho Mã Giảm
-          </button>
+          
+          <div className="flex items-center gap-3">
+            <button 
+                onClick={onOpenHunter}
+                className="flex items-center gap-1 bg-yellow-100 text-orange-700 px-3 py-2 rounded-full text-sm font-semibold hover:bg-yellow-200 transition"
+            >
+                <Tag size={16} /> <span className="hidden sm:inline">Săn Mã</span>
+            </button>
+            
+            <button 
+                onClick={onOpenCart}
+                className="relative p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition text-gray-800"
+            >
+                <ShoppingCart size={20} />
+                {cartItemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+                        {cartItemCount}
+                    </span>
+                )}
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Promo Banner */}
       <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white text-center py-2 px-4 text-xs md:text-sm font-bold animate-pulse cursor-pointer" onClick={onOpenHunter}>
-        🔥KHÔNG CÓ MÃ GIẢM GIÁ? VÀO LẤY NGAY ĐỂ MUA COMBO CHÁY 🔥
+        🔥 BẠN ĐÃ CÓ MÃ GIẢM GIÁ CHƯA? VÀO LẤY NGAY 🔥
       </div>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -103,11 +117,11 @@ export const Shop: React.FC<Props> = ({ combos, onOpenHunter }) => {
                     </div>
                     
                     <button 
-                        onClick={() => handleBuy(combo.link)}
+                        onClick={() => onAddToCart(combo)}
                         className="bg-gray-900 hover:bg-orange-600 text-white pl-5 pr-4 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-2 group/btn"
                     >
-                        Mua Ngay 
-                        <ExternalLink size={18} className="group-hover/btn:translate-x-1 transition" />
+                        Thêm Vào Giỏ
+                        <Plus size={18} className="group-hover/btn:rotate-90 transition" />
                     </button>
                 </div>
               </div>

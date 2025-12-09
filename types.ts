@@ -7,7 +7,7 @@ export interface Combo {
   price: number;
   imageUrl: string;
   tags: string[];
-  link: string;       // External link to buy
+  link?: string;       // Optional now as we use cart
   coupon?: string;    // Specific coupon code for this item
 }
 
@@ -23,8 +23,25 @@ export interface CartItem extends Combo {
   quantity: number;
 }
 
+export interface UserProfile {
+  name: string;
+  phone: string;
+  emailOrPhone: string; // Used as username
+}
+
+export interface Order {
+  id?: string;
+  user: UserProfile;
+  items: CartItem[];
+  total: number;
+  createdAt: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  appliedCoupon?: string;
+}
+
 export enum AppView {
-  LANDING = 'LANDING',
+  AUTH = 'AUTH',
   SHOP = 'SHOP',
-  COUPON_LIST = 'COUPON_LIST'
+  COUPON_LIST = 'COUPON_LIST',
+  ADMIN = 'ADMIN'
 }
