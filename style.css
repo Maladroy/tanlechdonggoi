@@ -1,0 +1,25 @@
+@import "tailwindcss";
+body {
+    font-family: "Be Vietnam Pro", sans-serif;
+}
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}

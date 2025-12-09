@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = process.env.API_KEY || "";
 const ai = new GoogleGenAI({ apiKey });
 
 const SHOPKEEPER_SYSTEM_PROMPT = `
@@ -13,36 +13,42 @@ Nhiệm vụ: Khách hàng sẽ vào xin mã giảm giá.
 - Nếu bạn quyết định cho mã, hãy để mã đó trong dấu ngoặc vuông ví dụ [TANLECH50] để hệ thống nhận diện.
 `;
 
-export const chatWithShopkeeper = async (history: { role: string, parts: { text: string }[] }[], newMessage: string) => {
-  try {
-    const model = 'gemini-2.5-flash';
-    
-    // Convert history format if needed, but for single-turn logic or simple chat context we can rebuild
-    const chat = ai.chats.create({
-      model,
-      config: {
-        systemInstruction: SHOPKEEPER_SYSTEM_PROMPT,
-        temperature: 0.9,
-      },
-      history: history // Pass existing history
-    });
+export const chatWithShopkeeper = async (
+	history: { role: string; parts: { text: string }[] }[],
+	newMessage: string,
+) => {
+	try {
+		const model = "gemini-2.5-flash";
 
-    const result = await chat.sendMessage({ message: newMessage });
-    return result.text;
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Hệ thống đang bận đóng gói combo, bác quay lại sau nhé!";
-  }
+		// Convert history format if needed, but for single-turn logic or simple chat context we can rebuild
+		const chat = ai.chats.create({
+			model,
+			config: {
+				systemInstruction: SHOPKEEPER_SYSTEM_PROMPT,
+				temperature: 0.9,
+			},
+			history: history, // Pass existing history
+		});
+
+		const result = await chat.sendMessage({ message: newMessage });
+		return result.text;
+	} catch (error) {
+		console.error("Gemini Error:", error);
+		return "Hệ thống đang bận đóng gói combo, bác quay lại sau nhé!";
+	}
 };
 
-export const generateCreativeDescription = async (comboName: string, items: string[]) => {
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Viết một mô tả ngắn (1 câu), cực kỳ hấp dẫn và hài hước kiểu quảng cáo Facebook cho combo tên là "${comboName}" bao gồm: ${items.join(', ')}.`,
-        });
-        return response.text;
-    } catch (e) {
-        return "Combo siêu hời, không mua tiếc ráng chịu!";
-    }
-}
+export const generateCreativeDescription = async (
+	comboName: string,
+	items: string[],
+) => {
+	try {
+		const response = await ai.models.generateContent({
+			model: "gemini-2.5-flash",
+			contents: `Viết một mô tả ngắn (1 câu), cực kỳ hấp dẫn và hài hước kiểu quảng cáo Facebook cho combo tên là "${comboName}" bao gồm: ${items.join(", ")}.`,
+		});
+		return response.text;
+	} catch (e) {
+		return "Combo siêu hời, không mua tiếc ráng chịu!";
+	}
+};
