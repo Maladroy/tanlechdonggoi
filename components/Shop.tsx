@@ -151,9 +151,11 @@ export const Shop: React.FC<Props> = ({
 
                 <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-gray-400 text-xs line-through decoration-red-500">
-                      {combo.originalPrice.toLocaleString("vi-VN")}₫
-                    </span>
+                    {combo.originalPrice > combo.price && (
+                      <span className="text-gray-400 text-xs line-through decoration-red-500">
+                        {combo.originalPrice.toLocaleString("vi-VN")}₫
+                      </span>
+                    )}
                     <span className="text-2xl font-black text-gray-900">
                       {combo.price.toLocaleString("vi-VN")}
                       <span className="text-xs font-normal text-gray-500 ml-1">

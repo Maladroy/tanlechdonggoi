@@ -46,12 +46,15 @@ service cloud.firestore {
       allow update: if isAuth() && request.auth.uid == userId && 
         (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == resource.data.isAdmin);
         
-      // Admin can write anything (overrides above if needed, but above specific rules are usually enough. 
-      // To be safe, allow write if isAdmin separately? No, better keep specific permissions.)
-      // But wait, if isAdmin() is true, they should be able to update any user profile (e.g. to promote someone).
-      
-      // So, let's add OR isAdmin() to write.
+      // Admin can write anything
       allow write: if isAdmin();
+    }
+
+    // User Lookup (Email -> Phone Mapping)
+    // Required for "Login by Email" feature since Auth is phone-based.
+    match /user_lookup/{email} {
+      allow read: if true;
+      allow write: if isAuth();
     }
   }
 }

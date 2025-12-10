@@ -1,5 +1,7 @@
-import React, { useState } from "react";
-import { X, Save, User, Phone, Mail } from "lucide-react";
+import { useForm } from "@tanstack/react-form";
+import { Mail, Phone, Save, User, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 import type { UserProfile } from "../types";
 
 interface Props {
@@ -17,32 +19,42 @@ export const ProfileModal: React.FC<Props> = ({
     onUpdate,
     onLogout,
 }) => {
-    const [name, setName] = useState(user.name);
-    const [phone, setPhone] = useState(user.phone);
-    const [email, setEmail] = useState(user.email || "");
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [message, setMessage] = useState<{
+        type: "success" | "error";
+        text: string;
+    } | null>(null);
+
+    const form = useForm({
+        defaultValues: {
+            name: user.name,
+            phone: user.phone,
+            email: user.email || "",
+        },
+        onSubmit: async ({ value }) => {
+            setLoading(true);
+            setMessage(null);
+
+            const success = await onUpdate({
+                name: value.name,
+                phone: value.phone,
+                email: value.email,
+            });
+            setLoading(false);
+
+            if (success) {
+                setMessage({ type: "success", text: "Cập nhật thành công!" });
+                setTimeout(() => {
+                    setMessage(null);
+                    onClose();
+                }, 1500);
+            } else {
+                setMessage({ type: "error", text: "Có lỗi xảy ra. Vui lòng thử lại." });
+            }
+        },
+    });
 
     if (!isOpen) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage(null);
-
-        const success = await onUpdate({ name, phone, email });
-        setLoading(false);
-
-        if (success) {
-            setMessage({ type: "success", text: "Cập nhật thành công!" });
-            setTimeout(() => {
-                setMessage(null);
-                onClose();
-            }, 1500);
-        } else {
-            setMessage({ type: "error", text: "Có lỗi xảy ra. Vui lòng thử lại." });
-        }
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -51,7 +63,11 @@ export const ProfileModal: React.FC<Props> = ({
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <User size={24} /> Hồ Sơ Của Bạn
                     </h2>
-                    <button type="button" onClick={onClose} className="hover:bg-orange-700 p-1 rounded-full transition">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="hover:bg-orange-700 p-1 rounded-full transition"
+                    >
                         <X size={24} />
                     </button>
                 </div>
@@ -60,73 +76,139 @@ export const ProfileModal: React.FC<Props> = ({
                     {message && (
                         <div
                             className={`mb-4 p-3 rounded-lg text-sm font-medium ${message.type === "success"
-                                ? "bg-green-100 text-green-700 border border-green-200"
-                                : "bg-red-100 text-red-700 border border-red-200"
+                                    ? "bg-green-100 text-green-700 border border-green-200"
+                                    : "bg-red-100 text-red-700 border border-red-200"
                                 }`}
                         >
                             {message.text}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    id="name"
-                                    type="text"
-                                    required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            form.handleSubmit();
+                        }}
+                        className="space-y-4"
+                    >
+                        <form.Field
+                            name="name"
+                            validators={{
+                                onChange: ({ value }) =>
+                                    value.trim().split(/\s+/).length < 2
+                                        ? "Vui lòng nhập họ và tên đầy đủ (tối thiểu 2 từ)."
+                                        : undefined,
+                            }}
+                        >
+                            {(field) => (
+                                <div>
+                                    <label
+                                        htmlFor="name"
+                                        className="block text-sm font-medium text-gray-700 mb-1"
+                                    >
+                                        Họ và tên
+                                    </label>
+                                    <div className="relative">
+                                        <User
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            size={18}
+                                        />
+                                        <input
+                                            id="name"
+                                            type="text"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            className={`w-full pl-10 p-3 bg-gray-50 border ${field.state.meta.errors.length
+                                                    ? "border-red-500"
+                                                    : "border-gray-200"
+                                                } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none`}
+                                        />
+                                    </div>
+                                    {field.state.meta.errors.length > 0 && (
+                                        <p className="text-xs text-red-500 mt-1">
+                                            {field.state.meta.errors.join(", ")}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </form.Field>
 
-                        <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    id="phone"
-                                    type="tel"
-                                    required
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
+                        <form.Field name="phone">
+                            {(field) => (
+                                <div>
+                                    <label
+                                        htmlFor="phone"
+                                        className="block text-sm font-medium text-gray-700 mb-1"
+                                    >
+                                        Số điện thoại
+                                    </label>
+                                    <div className="relative">
+                                        <Phone
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            size={18}
+                                        />
+                                        <input
+                                            id="phone"
+                                            type="tel"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </form.Field>
 
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                                />
-                            </div>
-                        </div>
+                        <form.Field name="email">
+                            {(field) => (
+                                <div>
+                                    <label
+                                        htmlFor="email"
+                                        className="block text-sm font-medium text-gray-700 mb-1"
+                                    >
+                                        Email
+                                    </label>
+                                    <div className="relative">
+                                        <Mail
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                                            size={18}
+                                        />
+                                        <input
+                                            id="email"
+                                            type="email"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            className="w-full pl-10 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </form.Field>
 
                         <div className="pt-4 flex flex-col gap-3">
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-orange-200"
+                            <form.Subscribe
+                                selector={(state) => [state.canSubmit, state.isSubmitting]}
                             >
-                                {loading ? (
-                                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-                                ) : (
-                                    <>
-                                        <Save size={20} /> Lưu Thay Đổi
-                                    </>
+                                {([canSubmit, isSubmitting]) => (
+                                    <button
+                                        type="submit"
+                                        disabled={!canSubmit || loading}
+                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-orange-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        {loading ? (
+                                            <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                                        ) : (
+                                            <>
+                                                <Save size={20} /> Lưu Thay Đổi
+                                            </>
+                                        )}
+                                    </button>
                                 )}
-                            </button>
+                            </form.Subscribe>
 
                             <button
                                 type="button"

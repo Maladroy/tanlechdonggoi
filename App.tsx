@@ -4,17 +4,20 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { AICodeHunter } from "./components/AICodeHunter";
 import { AuthGate } from "./components/AuthGate";
 import { Cart } from "./components/Cart";
+import { OrderSuccessModal } from "./components/OrderSuccessModal";
 import { ProfileModal } from "./components/ProfileModal";
+import { PromoPopup } from "./components/PromoPopup";
 import { Shop } from "./components/Shop";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   auth,
   getCombos,
+  getCoupons,
   getUserProfile,
   signOutUser,
   updateUserProfile,
 } from "./services/firebase";
-import type { CartItem, Combo, UserProfile } from "./types";
+import type { CartItem, Combo, Coupon, UserProfile } from "./types";
 import { AppView } from "./types";
 import "./font.css";
 import "./style.css";
@@ -23,6 +26,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.AUTH);
   const [combos, setCombos] = useState<Combo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // User State
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -32,11 +36,15 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       const data = await getCombos();
       setCombos(data);
+      const couponData = await getCoupons();
+      setCoupons(couponData);
       setLoading(false);
     };
     fetchData();
@@ -64,6 +72,7 @@ const App: React.FC = () => {
         setUser(null);
         setView(AppView.AUTH);
       }
+      setAuthLoading(false);
     });
 
     return () => unsubscribe();
@@ -118,9 +127,26 @@ const App: React.FC = () => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const updateQuantity = (id: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          const newQuantity = Math.max(1, item.quantity + delta);
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      })
+    );
+  };
+
   const clearCart = () => {
     setCart([]);
     setAppliedCode(null);
+  };
+
+  const handleOrderSuccess = () => {
+    setIsCartOpen(false);
+    setIsSuccessOpen(true);
   };
 
   // Coupon Logic
@@ -137,7 +163,7 @@ const App: React.FC = () => {
   };
 
   const renderView = () => {
-    if (loading && view !== AppView.AUTH && view !== AppView.ADMIN) {
+    if (authLoading || (loading && view !== AppView.AUTH && view !== AppView.ADMIN)) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
@@ -167,11 +193,12 @@ const App: React.FC = () => {
       default:
         return (
           <>
+            <PromoPopup />
             <Shop
               combos={combos}
               onOpenHunter={() => setView(AppView.COUPON_LIST)}
               onAddToCart={addToCart}
-              cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
+              cartItemCount={cart.length}
               onOpenCart={() => setIsCartOpen(true)}
               user={user}
               onOpenProfile={() => setIsProfileOpen(true)}
@@ -183,10 +210,16 @@ const App: React.FC = () => {
               cart={cart}
               user={user}
               onRemove={removeFromCart}
-              appliedCode={appliedCode}
-              onApplyCode={handleApplyCode}
-              onRemoveCode={() => setAppliedCode(null)}
+              onUpdateQuantity={updateQuantity}
+              coupons={coupons}
               onClearCart={clearCart}
+              onOrderSuccess={handleOrderSuccess}
+            />
+
+            <OrderSuccessModal
+              isOpen={isSuccessOpen}
+              onClose={() => setIsSuccessOpen(false)}
+              user={user}
             />
 
             {user && (

@@ -1,3 +1,6 @@
+export type ComboStatus = "available" | "out_of_stock" | "hidden";
+
+export type TupleSort = Date | number | string;
 export interface Combo {
 	id: string;
 	name: string;
@@ -9,6 +12,7 @@ export interface Combo {
 	tags: string[];
 	link?: string; // Optional now as we use cart
 	coupon?: string; // Specific coupon code for this item
+	status?: ComboStatus
 }
 
 export interface Coupon {
@@ -17,6 +21,9 @@ export interface Coupon {
 	desc: string;
 	color: string;
 	expiryDate: string; // ISO Date String (YYYY-MM-DD)
+	applicableCombos?: string[]; // IDs of combos this coupon applies to
+	type?: "fixed" | "percent"; // Type of discount
+	value?: number; // Amount (e.g. 50000) or Percent (e.g. 15 for 15%)
 }
 
 export interface CartItem extends Combo {
@@ -40,6 +47,11 @@ export interface Order {
 	createdAt: string;
 	status: "pending" | "confirmed" | "cancelled";
 	appliedCoupon?: string;
+	shippingAddress?: {
+		street: string;
+		city: string;
+		zipCode: string;
+	};
 }
 
 export enum AppView {
@@ -47,4 +59,14 @@ export enum AppView {
 	SHOP = "SHOP",
 	COUPON_LIST = "COUPON_LIST",
 	ADMIN = "ADMIN",
+}
+
+export interface Promo {
+	id: string;
+	title: string;
+	message: string;
+	couponCode: string;
+	discountValue?: string; // e.g. "10%" or "50k"
+	expiryDate: string;
+	isActive: boolean;
 }

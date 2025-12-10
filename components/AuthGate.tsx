@@ -1,3 +1,4 @@
+import { useForm } from "@tanstack/react-form";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -23,119 +24,119 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form State
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState(""); // Required for Register
-  const [email, setEmail] = useState(""); // Optional for Register
-  const [emailOrPhone, setEmailOrPhone] = useState(""); // Login Input
-  const [password, setPassword] = useState("");
-
   // Helper to check if input is a phone number
   const isPhoneNumber = (input: string) => /^[0-9+]{9,15}$/.test(input);
 
   // Helper to format phone as dummy email
   const getPhoneAsEmail = (phoneNum: string) => `${phoneNum}@tanlech.app`;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      phone: "",
+      email: "",
+      password: "",
+      emailOrPhone: "",
+    },
+    onSubmit: async ({ value }) => {
+      setError(null);
+      setIsLoading(true);
 
-
-    try {
-      if (isRegister) {
-        // --- REGISTRATION FLOW ---
-        // 1. Phone is the unique ID. Convert to dummy email.
-        if (!isPhoneNumber(phone)) {
-          throw { code: "custom/invalid-phone" };
-        }
-        const emailToRegister = getPhoneAsEmail(phone);
-
-        // 2. Create Auth User
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          emailToRegister,
-          password,
-        );
-        const user = userCredential.user;
-
-        // 3. Update basic profile
-        await updateProfile(user, {
-          displayName: name,
-        });
-
-        // 4. Create extended profile in Firestore
-        const userProfile: UserProfile = {
-          name,
-          phone,
-          emailOrPhone: phone, // Legacy field
-          email: email || undefined, // Optional email
-        };
-
-        await createUserProfile(user.uid, userProfile);
-        onLoginSuccess(userProfile);
-      } else {
-        // --- LOGIN FLOW ---
-        let loginEmail = "";
-
-        if (isPhoneNumber(emailOrPhone)) {
-          // Direct Phone Login
-          loginEmail = getPhoneAsEmail(emailOrPhone);
-        } else {
-          // Email Login -> Lookup Phone first
-          // We assume emailOrPhone is an email address
-          const profile = await getUserByEmail(emailOrPhone);
-          if (!profile || !profile.phone) {
-            throw { code: "custom/user-not-found" };
+      try {
+        if (isRegister) {
+          // --- REGISTRATION FLOW ---
+          if (!isPhoneNumber(value.phone)) {
+            throw { code: "custom/invalid-phone" };
           }
-          // Login using the found phone number
-          loginEmail = getPhoneAsEmail(profile.phone);
-        }
+          const emailToRegister = getPhoneAsEmail(value.phone);
 
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          loginEmail,
-          password,
-        );
-        const user = userCredential.user;
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            emailToRegister,
+            value.password
+          );
+          const user = userCredential.user;
 
-        // Fetch extended profile from Firestore
-        const profile = await getUserProfile(user.uid);
-
-        if (profile) {
-          onLoginSuccess(profile);
-        } else {
-          onLoginSuccess({
-            name: user.displayName || "Khách hàng",
-            phone: isPhoneNumber(emailOrPhone) ? emailOrPhone : "",
-            emailOrPhone,
+          await updateProfile(user, {
+            displayName: value.name,
           });
-        }
-      }
-    } catch (err: any) {
-      console.error("Auth Error:", err);
-      let msg = "Đã có lỗi xảy ra. Vui lòng thử lại.";
 
-      if (err.code === "custom/invalid-phone") {
-        msg = "Số điện thoại không hợp lệ.";
-      } else if (err.code === "custom/user-not-found") {
-        msg = "Email này chưa được đăng ký.";
-      } else if (err.code === "auth/email-already-in-use") {
-        msg = "Số điện thoại này đã được đăng ký.";
-      } else if (
-        err.code === "auth/user-not-found" ||
-        err.code === "auth/wrong-password" ||
-        err.code === "auth/invalid-credential"
-      ) {
-        msg = "Tài khoản hoặc mật khẩu không chính xác.";
-      } else if (err.code === "auth/weak-password") {
-        msg = "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
+          const userProfile: UserProfile = {
+            name: value.name,
+            phone: value.phone,
+            emailOrPhone: value.phone,
+          };
+
+          if (value.email) {
+            userProfile.email = value.email;
+          }
+
+          const success = await createUserProfile(user.uid, userProfile);
+          if (success) {
+            onLoginSuccess(userProfile);
+          } else {
+            throw { code: "custom/create-profile-failed" };
+          }
+        } else {
+          // --- LOGIN FLOW ---
+          let loginEmail = "";
+
+          if (isPhoneNumber(value.emailOrPhone)) {
+            loginEmail = getPhoneAsEmail(value.emailOrPhone);
+          } else {
+            const profile = await getUserByEmail(value.emailOrPhone);
+            if (!profile || !profile.phone) {
+              throw { code: "custom/user-not-found" };
+            }
+            loginEmail = getPhoneAsEmail(profile.phone);
+          }
+
+          const userCredential = await signInWithEmailAndPassword(
+            auth,
+            loginEmail,
+            value.password
+          );
+          const user = userCredential.user;
+
+          const profile = await getUserProfile(user.uid);
+
+          if (profile) {
+            onLoginSuccess(profile);
+          } else {
+            onLoginSuccess({
+              name: user.displayName || "Khách hàng",
+              phone: isPhoneNumber(value.emailOrPhone) ? value.emailOrPhone : "",
+              emailOrPhone: value.emailOrPhone,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.error("Auth Error:", err);
+        let msg = "Đã có lỗi xảy ra. Vui lòng thử lại.";
+
+        if (err.code === "custom/invalid-phone") {
+          msg = "Số điện thoại không hợp lệ.";
+        } else if (err.code === "custom/create-profile-failed") {
+          msg = "Không thể tạo hồ sơ người dùng. Vui lòng thử lại.";
+        } else if (err.code === "custom/user-not-found") {
+          msg = "Email này chưa được đăng ký.";
+        } else if (err.code === "auth/email-already-in-use") {
+          msg = "Số điện thoại này đã được đăng ký.";
+        } else if (
+          err.code === "auth/user-not-found" ||
+          err.code === "auth/wrong-password" ||
+          err.code === "auth/invalid-credential"
+        ) {
+          msg = "Tài khoản hoặc mật khẩu không chính xác.";
+        } else if (err.code === "auth/weak-password") {
+          msg = "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
+        }
+        setError(msg);
+      } finally {
+        setIsLoading(false);
       }
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center flex items-center justify-center p-4">
@@ -157,22 +158,24 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
           </p>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 text-sm rounded-lg border border-red-200 text-center font-medium animate-pulse">
             {error}
           </div>
         )}
 
-        {/* Tabs */}
         <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
           <button
             type="button"
             onClick={() => {
               setIsRegister(true);
               setError(null);
+              form.reset();
             }}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${isRegister ? "bg-white text-orange-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${isRegister
+                ? "bg-white text-orange-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             Đăng Ký
           </button>
@@ -181,107 +184,206 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
             onClick={() => {
               setIsRegister(false);
               setError(null);
+              form.reset();
             }}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${!isRegister ? "bg-white text-orange-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${!isRegister
+                ? "bg-white text-orange-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             Đăng Nhập
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
           {isRegister ? (
-            // --- REGISTER FORM ---
             <>
-              <div className="relative">
-                <User
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  required
-                  placeholder="Họ và tên"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
-                />
-              </div>
+              <form.Field
+                name="name"
+                validators={{
+                  onChange: ({ value }) =>
+                    value.trim().split(/\s+/).length < 2
+                      ? "Vui lòng nhập họ và tên đầy đủ (tối thiểu 2 từ)."
+                      : undefined,
+                }}
+              >
+                {(field) => (
+                  <div className="relative">
+                    <User
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={18}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Họ và tên"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
+                          ? "border-red-500"
+                          : "border-gray-200"
+                        } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
+                    />
+                    {field.state.meta.errors.length > 0 && (
+                      <span className="text-xs text-red-500 mt-1 block px-2">
+                        {field.state.meta.errors.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </form.Field>
 
-              <div className="relative">
-                <Mail
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  size={18}
-                />
-                <input
-                  type="email"
-                  placeholder="Email (Tùy chọn)"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
-                />
-              </div>
-              <div className="relative">
-                <Phone
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  size={18}
-                />
-                <input
-                  type="tel"
-                  required
-                  placeholder="Số điện thoại (Bắt buộc)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
-                />
-              </div>
+              <form.Field name="email">
+                {(field) => (
+                  <div className="relative">
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={18}
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email (Tùy chọn)"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
+                    />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="phone"
+                validators={{
+                  onChange: ({ value }) =>
+                    !isPhoneNumber(value)
+                      ? "Số điện thoại không hợp lệ"
+                      : undefined,
+                }}
+              >
+                {(field) => (
+                  <div className="relative">
+                    <Phone
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={18}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Số điện thoại (Bắt buộc)"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
+                          ? "border-red-500"
+                          : "border-gray-200"
+                        } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
+                    />
+                    {field.state.meta.errors.length > 0 && (
+                      <span className="text-xs text-red-500 mt-1 block px-2">
+                        {field.state.meta.errors.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </form.Field>
             </>
           ) : (
-            // --- LOGIN FORM ---
-            <div className="relative">
-              <User
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                required
-                placeholder="Số điện thoại hoặc Email"
-                value={emailOrPhone}
-                onChange={(e) => setEmailOrPhone(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
-              />
-            </div>
+            <form.Field
+              name="emailOrPhone"
+              validators={{
+                onChange: ({ value }) =>
+                  !value ? "Vui lòng nhập email hoặc số điện thoại" : undefined,
+              }}
+            >
+              {(field) => (
+                <div className="relative">
+                  <User
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    size={18}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Số điện thoại hoặc Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
+                        ? "border-red-500"
+                        : "border-gray-200"
+                      } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
+                  />
+                  {field.state.meta.errors.length > 0 && (
+                    <span className="text-xs text-red-500 mt-1 block px-2">
+                      {field.state.meta.errors.join(", ")}
+                    </span>
+                  )}
+                </div>
+              )}
+            </form.Field>
           )}
 
-          <div className="relative">
-            <Lock
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              type="password"
-              required
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-gray-300 hover:bg-orange-600 transition transform hover:-translate-y-1 flex items-center justify-center gap-2 mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
+          <form.Field
+            name="password"
+            validators={{
+              onChange: ({ value }) =>
+                value.length < 6
+                  ? "Mật khẩu phải có ít nhất 6 ký tự"
+                  : undefined,
+            }}
           >
-            {isLoading ? (
-              <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-            ) : (
-              <>
-                {isRegister ? "Hoàn Tất Đăng Ký" : "Đăng Nhập Ngay"}
-                <ArrowRight size={20} />
-              </>
+            {(field) => (
+              <div className="relative">
+                <Lock
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+                <input
+                  type="password"
+                  placeholder="Mật khẩu"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
+                      ? "border-red-500"
+                      : "border-gray-200"
+                    } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
+                />
+                {field.state.meta.errors.length > 0 && (
+                  <span className="text-xs text-red-500 mt-1 block px-2">
+                    {field.state.meta.errors.join(", ")}
+                  </span>
+                )}
+              </div>
             )}
-          </button>
+          </form.Field>
+
+          <form.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+          >
+            {([canSubmit, isSubmitting]) => (
+              <button
+                type="submit"
+                disabled={!canSubmit || isLoading}
+                className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-gray-300 hover:bg-orange-600 transition transform hover:-translate-y-1 flex items-center justify-center gap-2 mt-4 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                ) : (
+                  <>
+                    {isRegister ? "Hoàn Tất Đăng Ký" : "Đăng Nhập Ngay"}
+                    <ArrowRight size={20} />
+                  </>
+                )}
+              </button>
+            )}
+          </form.Subscribe>
         </form>
       </div>
     </div>
