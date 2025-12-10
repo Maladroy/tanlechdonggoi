@@ -55,6 +55,7 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
       {/* Header */}
       <div className="w-full max-w-md flex items-center justify-between mb-8">
         <button
+          type="button"
           onClick={onBack}
           className="p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition"
         >
@@ -78,15 +79,15 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
           </div>
         ) : (
-          coupons.map((coupon, idx) => {
+          coupons.map((coupon) => {
             const expired = isExpired(coupon.expiryDate);
             return (
               <div
-                key={idx}
+                key={coupon.id}
                 className={`relative group perspective ${expired ? "opacity-70 grayscale" : ""}`}
               >
                 <div
-                  className={`relative overflow-hidden bg-gradient-to-r ${coupon.color} rounded-2xl shadow-xl transform transition-transform duration-300 ${!expired ? "hover:scale-[1.02] hover:-rotate-1" : ""}`}
+                  className={`relative overflow-hidden bg-linear-to-r ${coupon.color} rounded-2xl shadow-xl transform transition-transform duration-300 ${!expired ? "hover:scale-[1.02] hover:-rotate-1" : ""}`}
                 >
                   {/* Decorative Circles */}
                   <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-yellow-50 rounded-full"></div>
@@ -110,6 +111,7 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
 
                       <div className="pl-4 border-l border-white/20 border-dashed flex items-center">
                         <button
+                          type="button"
                           onClick={() => !expired && handleCopy(coupon.code)}
                           disabled={expired}
                           className={`bg-white text-gray-900 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition flex items-center gap-2 min-w-[100px] justify-center ${expired ? "cursor-not-allowed bg-gray-200 text-gray-500" : "hover:bg-gray-50 active:scale-95"}`}
@@ -146,7 +148,7 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
 
                   {/* Shine Effect (Only if not expired) */}
                   {!expired && (
-                    <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
+                    <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-linear-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
                   )}
                 </div>
               </div>
@@ -157,6 +159,7 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
 
       <div className="mt-10 w-full max-w-md">
         <button
+          type="button"
           onClick={onGoToShop}
           className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg shadow-2xl shadow-gray-400 hover:bg-orange-600 transition transform hover:-translate-y-1 flex items-center justify-center gap-2"
         >

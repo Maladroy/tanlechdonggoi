@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { createOrder } from "../services/firebase";
+import { auth, createOrder } from "../services/firebase";
 import type { CartItem, UserProfile } from "../types";
 
 interface Props {
@@ -73,11 +73,12 @@ export const Cart: React.FC<Props> = ({
   };
 
   const handleCheckout = async () => {
-    if (!user) return;
+    if (!user || !auth.currentUser) return;
     setIsSubmitting(true);
 
     // Simulate API call
     const success = await createOrder({
+      userId: auth.currentUser.uid,
       user: user,
       items: cart,
       total: finalTotal,

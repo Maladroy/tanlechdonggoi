@@ -4,8 +4,16 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { AICodeHunter } from "./components/AICodeHunter";
 import { AuthGate } from "./components/AuthGate";
 import { Cart } from "./components/Cart";
+import { ProfileModal } from "./components/ProfileModal";
 import { Shop } from "./components/Shop";
-import { getCombos } from "./services/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  auth,
+  getCombos,
+  getUserProfile,
+  signOutUser,
+  updateUserProfile,
+} from "./services/firebase";
 import type { CartItem, Combo, UserProfile } from "./types";
 import { AppView } from "./types";
 import "./font.css";
@@ -18,6 +26,7 @@ const App: React.FC = () => {
 
   // User State
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Cart State
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -31,17 +40,62 @@ const App: React.FC = () => {
       setLoading(false);
     };
     fetchData();
-  }, [view]); // Refetch when view changes (e.g. returning from Admin)
+
+    // Listen for Auth Changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const profile = await getUserProfile(firebaseUser.uid);
+        if (profile) {
+          setUser(profile);
+          if (profile.isAdmin) {
+            setView(AppView.ADMIN);
+          } else {
+            setView(AppView.SHOP);
+          }
+        } else {
+          setUser({
+            name: firebaseUser.displayName || "Khách hàng",
+            phone: "",
+            emailOrPhone: firebaseUser.email || "",
+          });
+          setView(AppView.SHOP);
+        }
+      } else {
+        setUser(null);
+        setView(AppView.AUTH);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []); // Remove dependency on [view] to avoid infinite loops, but keep fetching data on mount
 
   // Auth Handlers
   const handleLogin = (userProfile: UserProfile) => {
     setUser(userProfile);
-    setView(AppView.SHOP);
+    if (userProfile.isAdmin) {
+      setView(AppView.ADMIN);
+    } else {
+      setView(AppView.SHOP);
+    }
   };
 
-  const handleAdminLogin = () => {
-    setUser({ name: "Admin", phone: "000000", emailOrPhone: "admin" });
-    setView(AppView.ADMIN);
+  const handleLogout = async () => {
+    await signOutUser();
+    setUser(null);
+    setView(AppView.AUTH);
+    setCart([]);
+    setIsProfileOpen(false);
+  };
+
+  const handleUpdateProfile = async (data: Partial<UserProfile>) => {
+    if (user && auth.currentUser) {
+      const success = await updateUserProfile(auth.currentUser.uid, data);
+      if (success) {
+        setUser({ ...user, ...data });
+        return true;
+      }
+    }
+    return false;
   };
 
   // Cart Handlers
@@ -96,12 +150,11 @@ const App: React.FC = () => {
         return (
           <AuthGate
             onLoginSuccess={handleLogin}
-            onAdminLogin={handleAdminLogin}
           />
         );
 
       case AppView.ADMIN:
-        return <AdminDashboard onLogout={() => setView(AppView.AUTH)} />;
+        return <AdminDashboard onLogout={handleLogout} />;
 
       case AppView.COUPON_LIST:
         return (
@@ -120,6 +173,8 @@ const App: React.FC = () => {
               onAddToCart={addToCart}
               cartItemCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
               onOpenCart={() => setIsCartOpen(true)}
+              user={user}
+              onOpenProfile={() => setIsProfileOpen(true)}
             />
 
             <Cart
@@ -133,6 +188,16 @@ const App: React.FC = () => {
               onRemoveCode={() => setAppliedCode(null)}
               onClearCart={clearCart}
             />
+
+            {user && (
+              <ProfileModal
+                user={user}
+                isOpen={isProfileOpen}
+                onClose={() => setIsProfileOpen(false)}
+                onUpdate={handleUpdateProfile}
+                onLogout={handleLogout}
+              />
+            )}
           </>
         );
     }

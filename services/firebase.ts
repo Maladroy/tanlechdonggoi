@@ -1,6 +1,6 @@
 import { getAnalytics } from "firebase/analytics";
 import { initializeApp, type FirebaseOptions } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, signOut } from "firebase/auth";
 import {
   addDoc,
   collection,
@@ -11,6 +11,7 @@ import {
   orderBy,
   query,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import type { Combo, Coupon, Order } from "../types";
 
@@ -161,6 +162,44 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   } catch (e) {
     console.error("Error fetching user profile:", e);
     return null;
+  }
+};
+
+export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
+  try {
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data() as UserProfile;
+    }
+    return null;
+  } catch (e) {
+    console.error("Error fetching user by email:", e);
+    return null;
+  }
+};
+
+export const updateUserProfile = async (
+  uid: string,
+  data: Partial<UserProfile>,
+): Promise<boolean> => {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, data);
+    return true;
+  } catch (e) {
+    console.error("Error updating profile", e);
+    return false;
+  }
+};
+
+export const signOutUser = async (): Promise<boolean> => {
+  try {
+    await signOut(auth);
+    return true;
+  } catch (e) {
+    console.error("Error signing out:", e);
+    return false;
   }
 };
 

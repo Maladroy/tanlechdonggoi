@@ -89,7 +89,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     e.preventDefault();
     const items = itemsInput.split(",").map((i) => i.trim());
     await addCombo({
-      ...(newCombo as any),
+      ...(newCombo as Omit<Combo, "id">),
       items,
       tags: ["Mới"],
     });
@@ -116,7 +116,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const handleAddCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addCoupon(newCoupon as any);
+    await addCoupon(newCoupon as Omit<Coupon, "id">);
     setShowAddCoupon(false);
     setNewCoupon({
       code: "",
@@ -218,13 +218,12 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                         #{order.id}
                       </span>
                       <span
-                        className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          order.status === "confirmed"
-                            ? "bg-green-100 text-green-700"
-                            : order.status === "cancelled"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-yellow-100 text-yellow-700"
-                        }`}
+                        className={`px-2 py-1 rounded text-xs font-bold uppercase ${order.status === "confirmed"
+                          ? "bg-green-100 text-green-700"
+                          : order.status === "cancelled"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-yellow-100 text-yellow-700"
+                          }`}
                       >
                         {order.status === "confirmed"
                           ? "Đã Chốt"
@@ -262,22 +261,26 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleStatusUpdate(order.id!, "confirmed")}
-                      className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100"
-                      title="Chốt đơn"
-                    >
-                      <CheckCircle size={20} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleStatusUpdate(order.id!, "cancelled")}
-                      className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100"
-                      title="Hủy đơn"
-                    >
-                      <XCircle size={20} />
-                    </button>
+                    {order.id && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(order.id, "confirmed")}
+                          className="bg-green-50 text-green-600 p-2 rounded hover:bg-green-100"
+                          title="Chốt đơn"
+                        >
+                          <CheckCircle size={20} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(order.id, "cancelled")}
+                          className="bg-red-50 text-red-600 p-2 rounded hover:bg-red-100"
+                          title="Hủy đơn"
+                        >
+                          <XCircle size={20} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))
@@ -442,11 +445,11 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
               {coupons.map((coupon) => (
                 <div
                   key={coupon.id}
-                  className={`p-4 rounded-xl text-white bg-gradient-to-r ${coupon.color} relative group`}
+                  className={`p-4 rounded-xl text-white bg-linear-to-r ${coupon.color} relative group`}
                 >
                   <button
                     type="button"
-                    onClick={() => handleDeleteCoupon(coupon.id!)}
+                    onClick={() => coupon.id && handleDeleteCoupon(coupon.id)}
                     className="absolute top-2 right-2 p-1 bg-white/20 rounded-full hover:bg-white/40 transition"
                   >
                     <Trash2 size={16} />

@@ -26,11 +26,14 @@ export interface CartItem extends Combo {
 export interface UserProfile {
 	name: string;
 	phone: string;
-	emailOrPhone: string; // Used as username
+	emailOrPhone: string; // Used as username (Legacy, usually same as phone)
+	email?: string; // Optional email for recovery/login
+	isAdmin?: boolean;
 }
 
 export interface Order {
 	id?: string;
+	userId: string; // Firebase Auth UID
 	user: UserProfile;
 	items: CartItem[];
 	total: number;

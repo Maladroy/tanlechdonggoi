@@ -1,6 +1,6 @@
 import { Clock, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
-import type { Combo } from "../types";
+import type { Combo, UserProfile } from "../types";
 
 interface Props {
   combos: Combo[];
@@ -8,6 +8,8 @@ interface Props {
   onAddToCart: (combo: Combo) => void;
   cartItemCount: number;
   onOpenCart: () => void;
+  user: UserProfile | null;
+  onOpenProfile: () => void;
 }
 
 export const Shop: React.FC<Props> = ({
@@ -16,6 +18,8 @@ export const Shop: React.FC<Props> = ({
   onAddToCart,
   cartItemCount,
   onOpenCart,
+  user,
+  onOpenProfile,
 }) => {
   return (
     <div className="min-h-screen pb-20 md:pb-0 bg-gray-50">
@@ -38,6 +42,19 @@ export const Shop: React.FC<Props> = ({
               className="flex items-center gap-1 bg-yellow-100 text-orange-700 px-3 py-2 rounded-full text-sm font-semibold hover:bg-yellow-200 transition"
             >
               <Tag size={16} /> <span className="hidden sm:inline">Săn Mã</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="flex items-center gap-2 bg-white border border-gray-200 rounded-full py-1 px-3 hover:bg-gray-50 transition cursor-pointer"
+            >
+              <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-xs">
+                {user?.name?.charAt(0).toUpperCase() || "K"}
+              </div>
+              <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[100px] truncate">
+                {user?.name || "Khách"}
+              </span>
             </button>
 
             <button

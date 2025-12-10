@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Helper function to check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Combos: Everyone can read, only Admin can write
+    match /combos/{comboId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupons: Everyone can read, only Admin can write
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Orders: 
+    // - Create: Authenticated users can create
+    // - Read: User can read own orders, Admin can read all
+    // - Update: Admin can update status
+    match /orders/{orderId} {
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin(); 
+    }
+    
+    // Users:
+    match /users/{userId} {
+      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      
+      // Create: User can create their own profile, but cannot set isAdmin to true (unless false)
+      allow create: if isAuth() && request.auth.uid == userId && 
+        (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == false);
+
+      // Update: User can update own profile, but cannot change isAdmin
+      allow update: if isAuth() && request.auth.uid == userId && 
+        (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == resource.data.isAdmin);
+        
+      // Admin can write anything (overrides above if needed, but above specific rules are usually enough. 
+      // To be safe, allow write if isAdmin separately? No, better keep specific permissions.)
+      // But wait, if isAdmin() is true, they should be able to update any user profile (e.g. to promote someone).
+      
+      // So, let's add OR isAdmin() to write.
+      allow write: if isAdmin();
+    }
+  }
+}
