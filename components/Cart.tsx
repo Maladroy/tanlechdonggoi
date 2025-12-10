@@ -44,18 +44,31 @@ export const Cart: React.FC<Props> = ({
   // Form for Shipping Address
   const form = useForm({
     defaultValues: {
+      name: user?.name || "",
+      phone: user?.phone || "",
       address: "",
       city: "",
       zipCode: "",
     },
     onSubmit: async ({ value }) => {
-      if (!user || !auth.currentUser) return;
-
       const { total } = calculateTotal();
 
+      let orderUser = user;
+      let userId = auth.currentUser?.uid;
+
+      if (!orderUser) {
+        orderUser = {
+          name: value.name,
+          phone: value.phone,
+        };
+        userId = "guest";
+      }
+
+      if (!userId || !orderUser) return;
+
       const success = await createOrder({
-        userId: auth.currentUser.uid,
-        user: user,
+        userId: userId,
+        user: orderUser,
         items: cart,
         total: total,
         createdAt: new Date().toISOString(),
@@ -256,7 +269,17 @@ export const Cart: React.FC<Props> = ({
           <div className="p-5 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             {/* Coupon Section */}
             <div className="mb-6">
-              {appliedCoupon ? (
+              {!user ? (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-blue-800 text-sm">
+                  <p className="font-bold flex items-center gap-2">
+                    <AlertCircle size={16} />
+                    Đăng ký để dùng mã giảm giá!
+                  </p>
+                  <p className="mt-1 text-xs">
+                    Khách hàng mới sẽ nhận được coupon giảm <strong>20%</strong> cho đơn hàng đầu tiên.
+                  </p>
+                </div>
+              ) : appliedCoupon ? (
                 <div className="flex justify-between items-center bg-green-50 border border-green-200 p-3 rounded-lg text-green-800">
                   <div className="flex items-center gap-2">
                     <CheckCircle size={18} />
@@ -343,12 +366,74 @@ export const Cart: React.FC<Props> = ({
                   Thông tin giao hàng
                 </h4>
 
-                <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 flex items-start gap-2">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  <span>
-                    Người nhận: <strong>{user?.name} - {user?.phone}</strong>
-                  </span>
-                </div>
+                {!user ? (
+                  <div className="space-y-2 mb-4">
+                    <form.Field
+                      name="name"
+                      validators={{
+                        onChange: ({ value }) =>
+                          !value ? "Vui lòng nhập họ tên" : undefined,
+                      }}
+                    >
+                      {(field) => (
+                        <>
+                          <input
+                            type="text"
+                            placeholder="Họ và tên"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-300"
+                              }`}
+                          />
+                          {field.state.meta.errors.length > 0 && (
+                            <p className="text-xs text-red-500">
+                              {field.state.meta.errors.join(", ")}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </form.Field>
+
+                    <form.Field
+                      name="phone"
+                      validators={{
+                        onChange: ({ value }) =>
+                          !value ? "Vui lòng nhập số điện thoại" : undefined,
+                      }}
+                    >
+                      {(field) => (
+                        <>
+                          <input
+                            type="tel"
+                            placeholder="Số điện thoại"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-300"
+                              }`}
+                          />
+                          {field.state.meta.errors.length > 0 && (
+                            <p className="text-xs text-red-500">
+                              {field.state.meta.errors.join(", ")}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </form.Field>
+                  </div>
+                ) : (
+                  <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 flex items-start gap-2 mb-2">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>
+                      Người nhận: <strong>{user.name} - {user.phone}</strong>
+                    </span>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <form.Field

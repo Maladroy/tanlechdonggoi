@@ -16,9 +16,10 @@ import type { UserProfile } from "../types";
 
 interface Props {
   onLoginSuccess: (user: UserProfile) => void;
+  onGuestAccess: () => void;
 }
 
-export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
+export const AuthGate: React.FC<Props> = ({ onLoginSuccess, onGuestAccess }) => {
   const [isRegister, setIsRegister] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -378,6 +379,16 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
             )}
           </form.Subscribe>
         </form>
+
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={onGuestAccess}
+            className="text-gray-500 text-sm hover:text-orange-600 font-medium underline transition"
+          >
+            Tiếp tục mà không cần đăng ký
+          </button>
+        </div>
       </div>
     </div>
   );

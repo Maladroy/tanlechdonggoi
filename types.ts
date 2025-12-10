@@ -10,6 +10,7 @@ export interface Combo {
 	price: number;
 	imageUrl: string;
 	tags: string[];
+	category?: string;
 	link?: string; // Optional now as we use cart
 	coupon?: string; // Specific coupon code for this item
 	status?: ComboStatus

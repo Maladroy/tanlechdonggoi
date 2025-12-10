@@ -10,11 +10,12 @@ import {
   ShoppingCart,
   Tag,
   Trash2,
+  Users,
   X,
   XCircle,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   addCombo,
   addCoupon,
@@ -23,23 +24,25 @@ import {
   getCombos,
   getCoupons,
   getOrders,
+  getUsers,
   updateCombo,
   updateCoupon,
   updateOrderStatus,
 } from "../services/firebase";
-import type { Combo, ComboStatus, Coupon, Order, TupleSort } from "../types";
+import type { Combo, ComboStatus, Coupon, Order, TupleSort, UserProfile } from "../types";
 
 interface Props {
   onLogout: () => void;
 }
 
 export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<"orders" | "combos" | "coupons">(
+  const [activeTab, setActiveTab] = useState<"orders" | "combos" | "coupons" | "users">(
     "orders"
   );
 
   // Data State
   const [orders, setOrders] = useState<Order[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [combos, setCombos] = useState<Combo[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -84,14 +87,16 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
 
   const refreshData = async () => {
     setLoading(true);
-    const [o, c, cp] = await Promise.all([
+    const [o, c, cp, u] = await Promise.all([
       getOrders(),
       getCombos(),
       getCoupons(),
+      getUsers(),
     ]);
     setOrders(o);
     setCombos(c);
     setCoupons(cp);
+    setUsers(u);
     setLoading(false);
   };
 
@@ -276,6 +281,78 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     });
   };
 
+  const customerList = useMemo(() => {
+    const list: Record<string, {
+      name: string;
+      phone: string;
+      type: "Potential" | "Customer" | "Loyal";
+      totalOrders: number;
+      totalSpent: number;
+      lastOrderDate?: string;
+    }> = {};
+
+    // 1. Initialize with registered users
+    users.forEach(u => {
+      if (!u.phone) return;
+      list[u.phone] = {
+        name: u.name,
+        phone: u.phone,
+        type: "Customer",
+        totalOrders: 0,
+        totalSpent: 0
+      };
+    });
+
+    // 2. Process orders
+    orders.forEach(o => {
+      const key = o.user.phone;
+      if (!key) return;
+
+      if (!list[key]) {
+        // New person (must be guest/potential)
+        list[key] = {
+          name: o.user.name,
+          phone: o.user.phone,
+          type: "Potential",
+          totalOrders: 0,
+          totalSpent: 0
+        };
+      }
+
+      // Update stats
+      if (o.status !== "cancelled") {
+        list[key].totalOrders += 1;
+        list[key].totalSpent += o.total;
+
+        // Track last order date
+        if (!list[key].lastOrderDate || new Date(o.createdAt) > new Date(list[key].lastOrderDate)) {
+          list[key].lastOrderDate = o.createdAt;
+        }
+      }
+
+      // Update Status logic
+      const isActuallyRegistered = users.some(u => u.phone === key);
+
+      if (isActuallyRegistered) {
+        if (list[key].totalOrders > 0) {
+          list[key].type = "Loyal";
+        } else {
+          list[key].type = "Customer";
+        }
+      } else {
+        list[key].type = "Potential";
+      }
+    });
+
+    return Object.values(list).sort((a, b) => {
+      // Sort by loyal > customer > potential, then by spend
+      const typeScore = { "Loyal": 3, "Customer": 2, "Potential": 1 };
+      const scoreDiff = typeScore[b.type] - typeScore[a.type];
+      if (scoreDiff !== 0) return scoreDiff;
+      return b.totalSpent - a.totalSpent;
+    });
+  }, [users, orders]);
+
   return (
     <div className="min-h-screen bg-slate-100 flex">
       {/* Sidebar */}
@@ -316,6 +393,16 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           >
             <Tag size={20} /> Mã Giảm Giá
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("users")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "users"
+              ? "bg-orange-600 text-white"
+              : "text-slate-400 hover:bg-slate-800"
+              }`}
+          >
+            <Users size={20} /> Khách Hàng
+          </button>
         </nav>
         <div className="p-4 border-t border-slate-700">
           <button
@@ -335,6 +422,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
             {activeTab === "orders" && "Danh Sách Đơn Hàng"}
             {activeTab === "combos" && "Kho Combo Hàng Hóa"}
             {activeTab === "coupons" && "Quản Lý Khuyến Mãi"}
+            {activeTab === "users" && "Danh Sách Khách Hàng"}
           </h2>
           <div className="flex items-center gap-3">
             <button
@@ -1106,6 +1194,55 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* USERS TAB */}
+        {activeTab === "users" && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="p-4">Khách Hàng</th>
+                  <th className="p-4">Số Điện Thoại</th>
+                  <th className="p-4">Loại Khách</th>
+                  <th className="p-4 text-right">Tổng Đơn</th>
+                  <th className="p-4 text-right">Tổng Chi Tiêu</th>
+                  <th className="p-4">Lần Cuối Mua</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {customerList.map((customer) => (
+                  <tr key={customer.phone} className="hover:bg-slate-50">
+                    <td className="p-4 font-bold text-slate-800">
+                      {customer.name}
+                    </td>
+                    <td className="p-4 font-mono">
+                      {customer.phone}
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold border ${customer.type === "Loyal" ? "bg-orange-100 text-orange-700 border-orange-200" :
+                        customer.type === "Customer" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                          "bg-gray-100 text-gray-700 border-gray-200"
+                        }`}>
+                        {customer.type === "Loyal" ? "👑 Khách Hàng Thân Thiết" :
+                          customer.type === "Customer" ? "👤 Khách Hàng" :
+                            "🛍️ Khách Tiềm Năng"}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      {customer.totalOrders}
+                    </td>
+                    <td className="p-4 text-right font-bold text-slate-700">
+                      {customer.totalSpent.toLocaleString()}đ
+                    </td>
+                    <td className="p-4 text-xs text-slate-500">
+                      {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : "Chưa mua"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

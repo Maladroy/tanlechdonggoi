@@ -35,7 +35,7 @@ const App: React.FC = () => {
   // Cart State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  const [_, setAppliedCode] = useState<string | null>(null);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
 
@@ -69,7 +69,7 @@ const App: React.FC = () => {
         }
       } else {
         setUser(null);
-        setView(AppView.AUTH);
+        setView(AppView.SHOP);
       }
       setAuthLoading(false);
     });
@@ -90,7 +90,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await signOutUser();
     setUser(null);
-    setView(AppView.AUTH);
+    setView(AppView.SHOP);
     setCart([]);
     setIsProfileOpen(false);
   };
@@ -175,6 +175,7 @@ const App: React.FC = () => {
         return (
           <AuthGate
             onLoginSuccess={handleLogin}
+            onGuestAccess={() => setView(AppView.SHOP)}
           />
         );
 
@@ -200,7 +201,13 @@ const App: React.FC = () => {
               cartItemCount={cart.length}
               onOpenCart={() => setIsCartOpen(true)}
               user={user}
-              onOpenProfile={() => setIsProfileOpen(true)}
+              onOpenProfile={() => {
+                if (user) {
+                  setIsProfileOpen(true);
+                } else {
+                  setView(AppView.AUTH);
+                }
+              }}
             />
 
             <Cart

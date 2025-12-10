@@ -98,6 +98,16 @@ export const getOrders = async (): Promise<Order[]> => {
   }
 };
 
+export const getUsers = async (): Promise<UserProfile[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "users"));
+    return querySnapshot.docs.map((doc) => doc.data() as UserProfile);
+  } catch (e) {
+    console.error("Error fetching users:", e);
+    return [];
+  }
+};
+
 export const updateOrderStatus = async (
   orderId: string,
   status: "pending" | "confirmed" | "cancelled",

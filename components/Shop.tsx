@@ -1,5 +1,6 @@
 import { Clock, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
+import { useState, useMemo } from "react";
 import type { Combo, UserProfile } from "../types";
 
 interface Props {
@@ -21,6 +22,25 @@ export const Shop: React.FC<Props> = ({
   user,
   onOpenProfile,
 }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc">("default");
+
+  const categories = ["all", ...new Set(combos.map((c) => c.category).filter(Boolean) as string[])];
+
+  const filteredCombos = useMemo(() => {
+    let result = [...combos];
+    if (selectedCategory !== "all") {
+      result = result.filter((c) => c.category === selectedCategory);
+    }
+
+    if (sortBy === "price_asc") {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "price_desc") {
+      result.sort((a, b) => b.price - a.price);
+    }
+    return result;
+  }, [combos, selectedCategory, sortBy]);
+
   return (
     <div className="min-h-screen pb-20 md:pb-0 bg-gray-50">
       {/* Sticky Header */}
@@ -53,7 +73,7 @@ export const Shop: React.FC<Props> = ({
                 {user?.name?.charAt(0).toUpperCase() || "K"}
               </div>
               <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[100px] truncate">
-                {user?.name || "Khách"}
+                {user?.name || "Đăng nhập"}
               </span>
             </button>
 
@@ -83,7 +103,7 @@ export const Shop: React.FC<Props> = ({
       </button>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <div className="flex justify-between items-end">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               Danh Sách Combo 📦
@@ -92,14 +112,44 @@ export const Shop: React.FC<Props> = ({
               Chốt đơn nhanh kẻo hết hàng ngon!
             </p>
           </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
+            >
+              <option value="all">Tất cả danh mục</option>
+              {categories.filter(c => c !== "all").map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
+            >
+              <option value="default">Mới nhất</option>
+              <option value="price_asc">Giá: Thấp đến Cao</option>
+              <option value="price_desc">Giá: Cao đến Thấp</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {combos.map((combo) => (
+          {filteredCombos.map((combo) => (
             <div
               key={combo.id}
               className="relative bg-white rounded-3xl shadow-xl border border-gray-100 overflow-visible hover:shadow-2xl transition-all duration-300 group flex flex-col"
             >
+              {/* Off Percentage Badge */}
+              {combo.originalPrice > combo.price && (
+                <div className="absolute top-3 right-3 z-30 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md">
+                  -{Math.round(((combo.originalPrice - combo.price) / combo.originalPrice) * 100)}%
+                </div>
+              )}
+
               {/* Coupon Bow/Banner */}
               {combo.coupon && (
                 <div className="absolute -top-3 -right-3 z-20">
@@ -118,9 +168,9 @@ export const Shop: React.FC<Props> = ({
                   alt={combo.name}
                   className="w-full h-full object-cover transform group-hover:scale-105 transition duration-700"
                 />
-                {/* <div className="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
+                <div className="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
                   {combo.tags}
-                </div> */}
+                </div>
                 {/* Sale Timer */}
                 {/* <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
                   <Clock size={12} /> Flash Sale
@@ -183,7 +233,7 @@ export const Shop: React.FC<Props> = ({
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 py-8 bg-gray-100 text-center text-gray-400 text-sm">
+      <footer className="mt-12 py-8 bg-gray-100 text-center text-gray-400 text-sm rel-0 fixed bottom-0 w-full">
         <p>© 2025 Tân Lếch Đóng Gói. Chỉ bán Combo, không bán lẻ.</p>
       </footer>
     </div>
