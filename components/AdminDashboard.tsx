@@ -95,9 +95,11 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     setLoading(false);
   };
 
+  // eslint-disable-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <NONE>
   useEffect(() => {
     refreshData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filter & Sort Orders
   useEffect(() => {

@@ -50,11 +50,5 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // User Lookup (Email -> Phone Mapping)
-    // Required for "Login by Email" feature since Auth is phone-based.
-    match /user_lookup/{email} {
-      allow read: if true;
-      allow write: if isAuth();
-    }
   }
 }

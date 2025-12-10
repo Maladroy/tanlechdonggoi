@@ -40,7 +40,6 @@ export const Cart: React.FC<Props> = ({
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponInput, setCouponInput] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form for Shipping Address
   const form = useForm({
@@ -52,9 +51,7 @@ export const Cart: React.FC<Props> = ({
     onSubmit: async ({ value }) => {
       if (!user || !auth.currentUser) return;
 
-      setIsSubmitting(true);
-
-      const { total, discountAmount } = calculateTotal();
+      const { total } = calculateTotal();
 
       const success = await createOrder({
         userId: auth.currentUser.uid,
@@ -71,7 +68,6 @@ export const Cart: React.FC<Props> = ({
         },
       });
 
-      setIsSubmitting(false);
       if (success) {
         onClearCart();
         onOrderSuccess();
@@ -93,65 +89,23 @@ export const Cart: React.FC<Props> = ({
     // Check expiry
     if (new Date(coupon.expiryDate) < new Date()) return 0;
 
-    let discount = 0;
-
-    // 1. If coupon applies to specific combos
+    // If coupon is restricted to specific combos, require at least one eligible item
     if (coupon.applicableCombos && coupon.applicableCombos.length > 0) {
-      cartItems.forEach((item) => {
-        if (coupon.applicableCombos?.includes(item.id)) {
-          // Found a match
-          if (coupon.type === "fixed") {
-            // Usually fixed per item? Or fixed once if present?
-            // "50k off for buying Combo A" usually means 50k off the total price if Combo A is present.
-            // BUT user asked: "if user buy more than one of the exact combo, how would the coupon applied?"
-            // Common logic:
-            // - If it's a "voucher" (fixed value), it applies once per order.
-            // - If it's a "discount" (percent), it applies to all qualifying items.
-            // Let's implement: Fixed -> Once per order if item exists. Percent -> On all copies.
-
-            // Wait, if I buy 2 Combo A, and I have a 50k voucher for Combo A. Do I get 100k off?
-            // Usually vouchers are single use per order.
-            // HOWEVER, if it is "Price reduction" logic, it might be per item.
-            // Let's assume:
-            // Fixed: Applies ONCE if the item is in cart (capped at item price * quantity?)
-            // Percent: Applies to (item.price * quantity)
-          }
-
-          const itemTotal = item.price * item.quantity;
-
-          if (coupon.type === "percent" && coupon.value) {
-            discount += (itemTotal * coupon.value) / 100;
-          } else if (coupon.type === "fixed" && coupon.value) {
-            // If fixed, we only apply once per order generally?
-            // Or is it per item? Let's assume strict "coupon" behavior: applies once to the order if condition met.
-            // But we need to handle "multiple combos".
-            // If the coupon is specific to this item, maybe it's a "Flash Sale" price override? No, that's in Combo price.
-            // Let's go with: Fixed amount applies ONCE per order if qualifying item exists.
-            // But wait, if I have a coupon "GIAM50K" applicable to Combo A.
-            // If I buy Combo A and Combo B. I get 50k off.
-            // If I buy 2 Combo A. I get 50k off.
-            // This is the safest default.
-          }
-        }
-      });
-
-      // After checking all items, if we found qualifying items for a FIXED coupon:
-      if (coupon.type === "fixed" && coupon.value) {
-        const hasQualifyingItem = cartItems.some(item => coupon.applicableCombos?.includes(item.id));
-        if (hasQualifyingItem) {
-          discount += coupon.value;
-        }
-      }
-
-    } else {
-      // 2. Global Coupon (no specific applicableCombos)
-      if (coupon.type === "percent" && coupon.value) {
-        discount = (subtotal * coupon.value) / 100;
-      } else if (coupon.type === "fixed" && coupon.value) {
-        discount = coupon.value;
-      }
+      const hasEligibleItem = cartItems.some((item) =>
+        coupon.applicableCombos?.includes(item.id)
+      );
+      if (!hasEligibleItem) return 0;
     }
 
+    let discount = 0;
+
+    if (coupon.type === "percent" && coupon.value) {
+      discount = (subtotal * coupon.value) / 100;
+    } else if (coupon.type === "fixed" && coupon.value) {
+      discount = coupon.value;
+    }
+
+    // Always apply coupon on the order subtotal (not per item)
     return Math.min(discount, subtotal);
   };
 
@@ -264,7 +218,7 @@ export const Cart: React.FC<Props> = ({
                         >
                           <Minus size={14} />
                         </button>
-                        <span className="text-sm font-bold text-gray-800 px-2 min-w-[20px] text-center">
+                        <span className="text-sm font-bold text-gray-800 px-2 min-w-5 text-center">
                           {item.quantity}
                         </span>
                         <button
@@ -408,6 +362,8 @@ export const Cart: React.FC<Props> = ({
                       <>
                         <input
                           type="text"
+                          aria-label="Địa chỉ chi tiết"
+                          autoComplete="on"
                           placeholder="Địa chỉ chi tiết (Số nhà, đường...)"
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -437,6 +393,7 @@ export const Cart: React.FC<Props> = ({
                       {(field) => (
                         <div className="flex-1">
                           <input
+                            autoComplete="on"
                             type="text"
                             placeholder="Tỉnh / Thành phố"
                             value={field.state.value}
@@ -461,6 +418,7 @@ export const Cart: React.FC<Props> = ({
                       {(field) => (
                         <div className="w-1/3">
                           <input
+                            autoComplete="on"
                             type="text"
                             placeholder="Zipcode"
                             value={field.state.value}

@@ -10,7 +10,6 @@ import { useState } from "react";
 import {
   auth,
   createUserProfile,
-  getUserByEmail,
   getUserProfile,
 } from "../services/firebase";
 import type { UserProfile } from "../types";
@@ -36,7 +35,6 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
       phone: "",
       email: "",
       password: "",
-      emailOrPhone: "",
     },
     onSubmit: async ({ value }) => {
       setError(null);
@@ -64,11 +62,10 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
           const userProfile: UserProfile = {
             name: value.name,
             phone: value.phone,
-            emailOrPhone: value.phone,
           };
 
           if (value.email) {
-            userProfile.email = value.email;
+            userProfile.email = value.email.toLowerCase().trim();
           }
 
           const success = await createUserProfile(user.uid, userProfile);
@@ -81,14 +78,10 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
           // --- LOGIN FLOW ---
           let loginEmail = "";
 
-          if (isPhoneNumber(value.emailOrPhone)) {
-            loginEmail = getPhoneAsEmail(value.emailOrPhone);
+          if (isPhoneNumber(value.phone)) {
+            loginEmail = getPhoneAsEmail(value.phone);
           } else {
-            const profile = await getUserByEmail(value.emailOrPhone);
-            if (!profile || !profile.phone) {
-              throw { code: "custom/user-not-found" };
-            }
-            loginEmail = getPhoneAsEmail(profile.phone);
+            throw { code: "custom/invalid-phone" };
           }
 
           const userCredential = await signInWithEmailAndPassword(
@@ -105,8 +98,7 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
           } else {
             onLoginSuccess({
               name: user.displayName || "Khách hàng",
-              phone: isPhoneNumber(value.emailOrPhone) ? value.emailOrPhone : "",
-              emailOrPhone: value.emailOrPhone,
+              phone: value.phone,
             });
           }
         }
@@ -173,8 +165,8 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
               form.reset();
             }}
             className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${isRegister
-                ? "bg-white text-orange-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-orange-600 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
               }`}
           >
             Đăng Ký
@@ -187,8 +179,8 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
               form.reset();
             }}
             className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${!isRegister
-                ? "bg-white text-orange-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-orange-600 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
               }`}
           >
             Đăng Nhập
@@ -227,8 +219,8 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
-                          ? "border-red-500"
-                          : "border-gray-200"
+                        ? "border-red-500"
+                        : "border-gray-200"
                         } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
                     />
                     {field.state.meta.errors.length > 0 && (
@@ -281,8 +273,8 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
-                          ? "border-red-500"
-                          : "border-gray-200"
+                        ? "border-red-500"
+                        : "border-gray-200"
                         } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
                     />
                     {field.state.meta.errors.length > 0 && (
@@ -296,27 +288,28 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
             </>
           ) : (
             <form.Field
-              name="emailOrPhone"
+              name="phone"
               validators={{
                 onChange: ({ value }) =>
-                  !value ? "Vui lòng nhập email hoặc số điện thoại" : undefined,
+                  !value ? "Vui lòng nhập số điện thoại" : undefined,
               }}
             >
               {(field) => (
                 <div className="relative">
-                  <User
+                  <Phone
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                     size={18}
                   />
                   <input
-                    type="text"
-                    placeholder="Số điện thoại hoặc Email"
+                    type="tel"
+                    placeholder="Số điện thoại"
+                    autoComplete={isRegister ? "" : "on"}
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
-                        ? "border-red-500"
-                        : "border-gray-200"
+                      ? "border-red-500"
+                      : "border-gray-200"
                       } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
                   />
                   {field.state.meta.errors.length > 0 && (
@@ -351,8 +344,8 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   className={`w-full pl-10 pr-4 py-3 bg-gray-50 border ${field.state.meta.errors.length
-                      ? "border-red-500"
-                      : "border-gray-200"
+                    ? "border-red-500"
+                    : "border-gray-200"
                     } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition text-sm font-medium`}
                 />
                 {field.state.meta.errors.length > 0 && (
@@ -367,7 +360,7 @@ export const AuthGate: React.FC<Props> = ({ onLoginSuccess }) => {
           <form.Subscribe
             selector={(state) => [state.canSubmit, state.isSubmitting]}
           >
-            {([canSubmit, isSubmitting]) => (
+            {([canSubmit]) => (
               <button
                 type="submit"
                 disabled={!canSubmit || isLoading}

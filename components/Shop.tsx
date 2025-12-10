@@ -118,13 +118,13 @@ export const Shop: React.FC<Props> = ({
                   alt={combo.name}
                   className="w-full h-full object-cover transform group-hover:scale-105 transition duration-700"
                 />
-                <div className="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
-                  {combo.tags[0]}
-                </div>
+                {/* <div className="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
+                  {combo.tags}
+                </div> */}
                 {/* Sale Timer */}
-                <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                {/* <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
                   <Clock size={12} /> Flash Sale
-                </div>
+                </div> */}
               </div>
 
               <div className="p-5 flex-1 flex flex-col">

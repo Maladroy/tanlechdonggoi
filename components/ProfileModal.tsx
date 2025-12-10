@@ -30,6 +30,8 @@ export const ProfileModal: React.FC<Props> = ({
             name: user.name,
             phone: user.phone,
             email: user.email || "",
+            dob: user.dob || "",
+            gender: user.gender || "other",
         },
         onSubmit: async ({ value }) => {
             setLoading(true);
@@ -39,6 +41,8 @@ export const ProfileModal: React.FC<Props> = ({
                 name: value.name,
                 phone: value.phone,
                 email: value.email,
+                dob: value.dob,
+                gender: value.gender as "male" | "female" | "other",
             });
             setLoading(false);
 
@@ -76,8 +80,8 @@ export const ProfileModal: React.FC<Props> = ({
                     {message && (
                         <div
                             className={`mb-4 p-3 rounded-lg text-sm font-medium ${message.type === "success"
-                                    ? "bg-green-100 text-green-700 border border-green-200"
-                                    : "bg-red-100 text-red-700 border border-red-200"
+                                ? "bg-green-100 text-green-700 border border-green-200"
+                                : "bg-red-100 text-red-700 border border-red-200"
                                 }`}
                         >
                             {message.text}
@@ -121,8 +125,8 @@ export const ProfileModal: React.FC<Props> = ({
                                             onBlur={field.handleBlur}
                                             onChange={(e) => field.handleChange(e.target.value)}
                                             className={`w-full pl-10 p-3 bg-gray-50 border ${field.state.meta.errors.length
-                                                    ? "border-red-500"
-                                                    : "border-gray-200"
+                                                ? "border-red-500"
+                                                : "border-gray-200"
                                                 } rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none`}
                                         />
                                     </div>
@@ -188,6 +192,53 @@ export const ProfileModal: React.FC<Props> = ({
                                 </div>
                             )}
                         </form.Field>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <form.Field name="dob">
+                                {(field) => (
+                                    <div>
+                                        <label
+                                            htmlFor="dob"
+                                            className="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Ngày sinh
+                                        </label>
+                                        <input
+                                            id="dob"
+                                            type="date"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        />
+                                    </div>
+                                )}
+                            </form.Field>
+
+                            <form.Field name="gender">
+                                {(field) => (
+                                    <div>
+                                        <label
+                                            htmlFor="gender"
+                                            className="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Giới tính
+                                        </label>
+                                        <select
+                                            id="gender"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value as "male" | "female" | "other")}
+                                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        >
+                                            <option value="male">Nam</option>
+                                            <option value="female">Nữ</option>
+                                            <option value="other">Khác</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </form.Field>
+                        </div>
 
                         <div className="pt-4 flex flex-col gap-3">
                             <form.Subscribe

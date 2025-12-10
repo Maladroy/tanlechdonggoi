@@ -33,9 +33,10 @@ export interface CartItem extends Combo {
 export interface UserProfile {
 	name: string;
 	phone: string;
-	emailOrPhone: string; // Used as username (Legacy, usually same as phone)
-	email?: string; // Optional email for recovery/login
+	email?: string; // Optional email for recovery
 	isAdmin?: boolean;
+	dob?: string;
+	gender?: "male" | "female" | "other";
 }
 
 export interface Order {

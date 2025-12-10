@@ -64,7 +64,6 @@ const App: React.FC = () => {
           setUser({
             name: firebaseUser.displayName || "Khách hàng",
             phone: "",
-            emailOrPhone: firebaseUser.email || "",
           });
           setView(AppView.SHOP);
         }

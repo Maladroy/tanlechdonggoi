@@ -192,10 +192,10 @@ export const createUserProfile = async (
   profile: UserProfile,
 ): Promise<boolean> => {
   try {
-    await setDoc(doc(db, "users", uid), profile);
     if (profile.email) {
-      await updateUserLookup(profile.email, profile.phone);
+      profile.email = profile.email.toLowerCase();
     }
+    await setDoc(doc(db, "users", uid), profile);
     return true;
   } catch (e) {
     console.error("Error creating user profile:", e);
@@ -220,31 +220,12 @@ export const getUserByEmail = async (
   email: string,
 ): Promise<UserProfile | null> => {
   try {
-    // 1. Try to find phone from user_lookup
-    const lookupRef = doc(db, "user_lookup", email);
-    const lookupSnap = await getDoc(lookupRef);
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (lookupSnap.exists()) {
-      const { phone } = lookupSnap.data();
-      // 2. Fetch user profile using phone (uid equivalent logic needed? No, query by phone)
-      // Actually we need to find the user doc. User doc ID is UID.
-      // We can query users by phone.
-      const q = query(collection(db, "users"), where("phone", "==", phone));
-      const querySnapshot = await getDocs(q); // This requires auth? Yes.
-      // Wait, if we are unauth, we can't read users even if we have phone.
-      // We need the phone to LOGIN (to form dummy email).
-      // We DON'T need the full profile yet.
-      // This function 'getUserByEmail' returns UserProfile.
-      // It is used in AuthGate to get the PHONE.
-      // So we should just return a partial profile with phone?
-      if (!querySnapshot.empty) {
-        return querySnapshot.docs[0].data() as UserProfile;
-      }
-      return { phone } as UserProfile; // Partial return for login flow
-    }
-
-    // Fallback: Query users directly (will fail if unauth/rules active)
-    const q = query(collection(db, "users"), where("email", "==", email));
+    const q = query(
+      collection(db, "users"),
+      where("email", "==", normalizedEmail),
+    );
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
       return querySnapshot.docs[0].data() as UserProfile;
@@ -256,31 +237,17 @@ export const getUserByEmail = async (
   }
 };
 
-// Helper to update lookup
-const updateUserLookup = async (email: string, phone: string) => {
-  try {
-    await setDoc(doc(db, "user_lookup", email), { phone });
-  } catch (e) {
-    console.error("Error updating user lookup:", e);
-  }
-};
 
 export const updateUserProfile = async (
   uid: string,
   data: Partial<UserProfile>,
 ): Promise<boolean> => {
   try {
+    if (data.email) {
+      data.email = data.email.toLowerCase();
+    }
     const userRef = doc(db, "users", uid);
     await updateDoc(userRef, data);
-
-    if (data.email && data.phone) {
-      await updateUserLookup(data.email, data.phone);
-    } else if (data.email) {
-      // Need phone to update lookup correctly?
-      // For now assume phone doesn't change often or we fetch it.
-      // But updateUserProfile is generic.
-      // Let's rely on createUserProfile for initial setup.
-    }
 
     return true;
   } catch (e) {
