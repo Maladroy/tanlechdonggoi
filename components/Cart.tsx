@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { auth, createOrder, getOrdersByUser } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
 
@@ -23,6 +23,7 @@ interface Props {
   onRemove: (id: string) => void;
   onUpdateQuantity: (id: string, delta: number) => void;
   coupons: Coupon[]; // List of available coupons from DB
+  initialCouponCode?: string | null;
   onClearCart: () => void;
   onOrderSuccess: () => void;
 }
@@ -35,6 +36,7 @@ export const Cart: React.FC<Props> = ({
   onRemove,
   onUpdateQuantity,
   coupons,
+  initialCouponCode,
   onClearCart,
   onOrderSuccess,
 }) => {
@@ -42,6 +44,7 @@ export const Cart: React.FC<Props> = ({
   const [couponError, setCouponError] = useState("");
   const [couponInput, setCouponInput] = useState("");
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [hasAutoApplied, setHasAutoApplied] = useState(false);
 
   // Form for Shipping Address
   const form = useForm({
@@ -135,14 +138,15 @@ export const Cart: React.FC<Props> = ({
 
   const { discountAmount, total } = calculateTotal();
 
-  const handleApplyCoupon = async () => {
-    if (!couponInput) return;
+  const handleApplyCoupon = useCallback(async (codeOverride?: string) => {
+    const code = codeOverride || couponInput;
+    if (!code) return;
     setIsValidatingCoupon(true);
     setCouponError("");
 
     try {
       const found = coupons.find(
-        (c) => c.code.toUpperCase() === couponInput.toUpperCase()
+        (c) => c.code.toUpperCase() === code.toUpperCase()
       );
 
       if (!found) {
@@ -201,7 +205,7 @@ export const Cart: React.FC<Props> = ({
       }
 
       setAppliedCoupon(found);
-      setCouponInput("");
+      if (!codeOverride) setCouponInput("");
 
     } catch (e) {
       console.error(e);
@@ -209,7 +213,37 @@ export const Cart: React.FC<Props> = ({
     } finally {
       setIsValidatingCoupon(false);
     }
-  };
+  }, [couponInput, coupons, cart, user]);
+
+  // Reset auto-apply flag when cart opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasAutoApplied(false);
+    }
+  }, [isOpen]);
+
+  // Auto-apply logic for owned coupons: try all owned coupons until one is valid
+  useEffect(() => {
+    const tryAutoApply = async () => {
+      if (!(isOpen && !appliedCoupon && !hasAutoApplied && user?.ownedCoupons?.length && cart.length > 0)) {
+        return;
+      }
+      for (const code of user.ownedCoupons) {
+        if (user.usedCoupons?.includes(code)) continue;
+        await handleApplyCoupon(code);
+        if (appliedCoupon) break;
+      }
+      setHasAutoApplied(true);
+    };
+    tryAutoApply();
+  }, [isOpen, appliedCoupon, hasAutoApplied, user?.ownedCoupons, user?.usedCoupons, cart.length, handleApplyCoupon]);
+
+  useEffect(() => {
+    if (isOpen && initialCouponCode && !appliedCoupon) {
+      setCouponInput(initialCouponCode);
+      handleApplyCoupon(initialCouponCode);
+    }
+  }, [isOpen, initialCouponCode, appliedCoupon, handleApplyCoupon]);
 
   if (!isOpen) return null;
 
@@ -362,7 +396,7 @@ export const Cart: React.FC<Props> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={handleApplyCoupon}
+                      onClick={() => handleApplyCoupon()}
                       disabled={isValidatingCoupon || !couponInput}
                       className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 disabled:opacity-70 flex items-center gap-2"
                     >

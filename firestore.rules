@@ -18,6 +18,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Categories: Everyone can read, only Admin can write
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Settings: Everyone can read (needed for client-side logic), only Admin can write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Coupons: Everyone can read, only Admin can write
     match /coupons/{couponId} {
       allow read: if true;
@@ -44,11 +56,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
       
-      // Create: User can create their own profile, but cannot set isAdmin to true (unless false)
+      // Create: User can create their own profile, but cannot set isAdmin to true
       allow create: if isAuth() && request.auth.uid == userId && 
         (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == false);
 
-      // Update: User can update own profile, but cannot change isAdmin
+      // Update: User can update own profile (including usedCoupons, ownedCoupons), but cannot change isAdmin
       allow update: if isAuth() && request.auth.uid == userId && 
         (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == resource.data.isAdmin);
         

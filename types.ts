@@ -16,6 +16,12 @@ export interface Combo {
 	status?: ComboStatus
 }
 
+export interface Category {
+	id: string;
+	name: string;
+	description?: string;
+}
+
 export interface Coupon {
 	id?: string;
 	code: string;
@@ -41,6 +47,7 @@ export interface UserProfile {
 	dob?: string;
 	gender?: "male" | "female" | "other";
 	usedCoupons?: string[]; // List of coupon codes used by this user
+	ownedCoupons?: string[]; // List of coupon codes granted to this user
 }
 
 export interface Order {
@@ -74,4 +81,8 @@ export interface Promo {
 	discountValue?: string; // e.g. "10%" or "50k"
 	expiryDate: string;
 	isActive: boolean;
+}
+
+export interface SystemSettings {
+	newUserCouponCode?: string;
 }

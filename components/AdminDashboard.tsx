@@ -11,17 +11,17 @@ import type { Combo, Coupon, Order, UserProfile } from "../types";
 import { AdminCombos } from "./admin/AdminCombos";
 import { AdminCoupons } from "./admin/AdminCoupons";
 import { AdminOrders } from "./admin/AdminOrders";
-import { AdminSidebar } from "./admin/AdminSidebar";
+import { AdminSidebar, type AdminTab } from "./admin/AdminSidebar";
 import { AdminUsers } from "./admin/AdminUsers";
+import { AdminCategories } from "./admin/AdminCategories";
+import { AdminSettings } from "./admin/AdminSettings";
 
 interface Props {
   onLogout: () => void;
 }
 
 export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<
-    "orders" | "combos" | "coupons" | "users"
-  >("orders");
+  const [activeTab, setActiveTab] = useState<AdminTab>("orders");
 
   // Data State
   const [orders, setOrders] = useState<Order[]>([]);
@@ -45,6 +45,8 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
     setLoading(false);
   };
 
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: idk
   useEffect(() => {
     refreshData();
   }, []);
@@ -63,8 +65,10 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           <h2 className="text-2xl font-bold text-slate-800">
             {activeTab === "orders" && "Danh Sách Đơn Hàng"}
             {activeTab === "combos" && "Kho Combo Hàng Hóa"}
+            {activeTab === "categories" && "Quản Lý Danh Mục"}
             {activeTab === "coupons" && "Quản Lý Khuyến Mãi"}
             {activeTab === "users" && "Danh Sách Khách Hàng"}
+            {activeTab === "settings" && "Cài Đặt Hệ Thống"}
           </h2>
           <div className="flex items-center gap-3">
             <button
@@ -83,6 +87,9 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
         {activeTab === "combos" && (
           <AdminCombos combos={combos} onRefresh={refreshData} />
         )}
+        {activeTab === "categories" && (
+          <AdminCategories onRefresh={refreshData} />
+        )}
         {activeTab === "coupons" && (
           <AdminCoupons
             coupons={coupons}
@@ -91,6 +98,7 @@ export const AdminDashboard: React.FC<Props> = ({ onLogout }) => {
           />
         )}
         {activeTab === "users" && <AdminUsers users={users} orders={orders} />}
+        {activeTab === "settings" && <AdminSettings />}
       </div>
     </div>
   );

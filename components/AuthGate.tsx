@@ -8,15 +8,17 @@ import {
 import { ArrowRight, Loader2, Phone, ShoppingBag, User } from "lucide-react";
 import type React from "react";
 import { useEffect, useState, useRef } from "react";
-import { auth, createUserProfile, getUserProfile } from "../services/firebase";
+import { auth, createUserProfile } from "../services/firebase";
 import type { UserProfile } from "../types";
 
 interface Props {
+  isNewUser?: boolean;
   onLoginSuccess: (user: UserProfile) => void;
   onGuestAccess: () => void;
 }
 
 export const AuthGate: React.FC<Props> = ({
+  isNewUser = false,
   onLoginSuccess,
   onGuestAccess,
 }) => {
@@ -27,20 +29,36 @@ export const AuthGate: React.FC<Props> = ({
     useState<ConfirmationResult | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
 
-  // Refs for reCaptcha
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
-    // Initialize Recaptcha
+    if (isNewUser) {
+      setStep("profile");
+    }
+  }, [isNewUser]);
+
+  useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Recaptcha clear error", e);
+        }
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
+
+  const initRecaptcha = () => {
     if (!recaptchaVerifierRef.current && auth) {
       try {
         recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
           size: "invisible",
           callback: () => {
-            // reCAPTCHA solved, allow signInWithPhoneNumber.
+            // reCAPTCHA solved
           },
           "expired-callback": () => {
-            // Response expired. Ask user to solve reCAPTCHA again.
             setError("ReCAPTCHA hết hạn, vui lòng thử lại.");
           },
         });
@@ -48,21 +66,14 @@ export const AuthGate: React.FC<Props> = ({
         console.error("Recaptcha Init Error", e);
       }
     }
-
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, []);
+  };
 
   const handleSendOtp = async (phone: string) => {
     setError(null);
     setIsLoading(true);
+    initRecaptcha();
 
     try {
-      // Format phone number: +84...
       let formattedPhone = phone.trim();
       if (formattedPhone.startsWith("0")) {
         formattedPhone = `+84${formattedPhone.substring(1)}`;
@@ -71,7 +82,9 @@ export const AuthGate: React.FC<Props> = ({
       }
 
       if (!recaptchaVerifierRef.current) {
-        throw new Error("Recaptcha not initialized");
+        // Try re-init
+        initRecaptcha();
+        if (!recaptchaVerifierRef.current) throw new Error("Lỗi khởi tạo xác thực.");
       }
 
       const confirmation = await signInWithPhoneNumber(
@@ -90,18 +103,15 @@ export const AuthGate: React.FC<Props> = ({
         msg = "Số điện thoại không hợp lệ.";
       } else if (err.code === "auth/too-many-requests") {
         msg = "Quá nhiều yêu cầu. Vui lòng thử lại sau.";
+      } else if (err.message && err.message.includes("billing")) {
+        msg = "Lỗi cấu hình hệ thống (billing). Vui lòng liên hệ admin.";
       }
       setError(msg);
-      // Reset recaptcha
+
+      // Reset recaptcha on error
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
-        // Re-init happens via useEffect dependency? No, need to manually re-init or just reload page logic. 
-        // Ideally we just clear it and let the user try again which might trigger re-render if we handled it that way, 
-        // but here we just rely on the existing instance or create new one next time?
-        // Actually, verifying again usually requires a reset.
-        // Let's just create a new one next time the component mounts or just simple reload.
-        window.location.reload();
       }
     } finally {
       setIsLoading(false);
@@ -115,18 +125,9 @@ export const AuthGate: React.FC<Props> = ({
     try {
       if (!confirmationResult) throw new Error("No confirmation result");
 
-      const result = await confirmationResult.confirm(otp);
-      const user = result.user;
+      await confirmationResult.confirm(otp);
+      // Successful login. App.tsx will handle the rest.
 
-      // Check if user has profile
-      const profile = await getUserProfile(user.uid);
-
-      if (profile) {
-        onLoginSuccess(profile);
-      } else {
-        // New user, go to profile creation
-        setStep("profile");
-      }
     } catch (err: any) {
       console.error("Verify OTP Error:", err);
       setError("Mã OTP không chính xác hoặc đã hết hạn.");
@@ -146,7 +147,7 @@ export const AuthGate: React.FC<Props> = ({
 
       const newProfile: UserProfile = {
         name,
-        phone: phoneNumber,
+        phone: phoneNumber || user.phoneNumber || "",
         email: email || undefined
       };
 
@@ -207,7 +208,6 @@ export const AuthGate: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Recaptcha Container */}
         <div id="recaptcha-container"></div>
 
         {step === "phone" && (
@@ -382,7 +382,6 @@ export const AuthGate: React.FC<Props> = ({
             <profileForm.Field name="email">
               {(field) => (
                 <div className="relative">
-                  {/* Email icon or similar */}
                   <input
                     type="email"
                     placeholder="Email (không bắt buộc)"

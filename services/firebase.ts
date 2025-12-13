@@ -1,5 +1,6 @@
 import { getAnalytics } from "firebase/analytics";
 import { initializeApp, type FirebaseOptions } from "firebase/app";
+import { initializeUI } from "@firebase-oss/ui-core";
 import { getAuth, signOut } from "firebase/auth";
 import {
   addDoc,
@@ -15,9 +16,10 @@ import {
   limit,
   arrayUnion,
   setDoc,
-  getDoc
+  getDoc,
+  onSnapshot
 } from "firebase/firestore";
-import type { Combo, Coupon, Order, Promo, UserProfile } from "../types";
+import type { Category, Combo, Coupon, Order, Promo, SystemSettings, UserProfile } from "../types";
 
 // Firebase configuration from Vite environment variables
 const firebaseConfig: FirebaseOptions = {
@@ -32,8 +34,16 @@ const firebaseConfig: FirebaseOptions = {
 
 // Initialize Firebase (production-ready: no mock fallbacks)
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const auth = getAuth(app);
+
+auth.languageCode = "vi"; // Set auth UI language to Vietnamese
+
+
+const ui = initializeUI({
+  app,
+  auth,
+});
+const db = getFirestore(app);
 
 // Optional analytics (only in browser and when measurementId is provided)
 let analytics: ReturnType<typeof getAnalytics> | null = null;
@@ -217,6 +227,77 @@ export const updateCoupon = async (
   }
 };
 
+// --- Categories API ---
+
+export const getCategories = async (): Promise<Category[]> => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "categories"));
+    return querySnapshot.docs.map(
+      (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Category, "id">) }),
+    );
+  } catch (e) {
+    console.error("Error fetching categories:", e);
+    return [];
+  }
+};
+
+export const addCategory = async (category: Omit<Category, "id">): Promise<boolean> => {
+  try {
+    await addDoc(collection(db, "categories"), category);
+    return true;
+  } catch (e) {
+    console.error("Error adding category:", e);
+    return false;
+  }
+};
+
+export const updateCategory = async (id: string, data: Partial<Category>): Promise<boolean> => {
+  try {
+    const ref = doc(db, "categories", id);
+    await updateDoc(ref, data);
+    return true;
+  } catch (e) {
+    console.error("Error updating category:", e);
+    return false;
+  }
+};
+
+export const deleteCategory = async (id: string): Promise<boolean> => {
+  try {
+    await deleteDoc(doc(db, "categories", id));
+    return true;
+  } catch (e) {
+    console.error("Error deleting category:", e);
+    return false;
+  }
+};
+
+// --- Settings API ---
+
+export const getSystemSettings = async (): Promise<SystemSettings | null> => {
+  try {
+    const docSnap = await getDoc(doc(db, "settings", "general"));
+    if (docSnap.exists()) {
+      return { id: "general", ...docSnap.data() } as SystemSettings;
+    }
+    return null;
+  } catch (e) {
+    console.error("Error fetching settings:", e);
+    return null;
+  }
+};
+
+export const updateSystemSettings = async (data: Partial<SystemSettings>): Promise<boolean> => {
+  try {
+    const ref = doc(db, "settings", "general");
+    await setDoc(ref, data, { merge: true });
+    return true;
+  } catch (e) {
+    console.error("Error updating settings:", e);
+    return false;
+  }
+};
+
 // --- User Profile API ---
 
 export const createUserProfile = async (
@@ -227,12 +308,39 @@ export const createUserProfile = async (
     if (profile.email) {
       profile.email = profile.email.toLowerCase();
     }
-    await setDoc(doc(db, "users", uid), profile);
+
+    // Sanitize undefined values
+    const sanitizedProfile = JSON.parse(JSON.stringify(profile));
+
+    // Check for New User Coupon
+    const settings = await getSystemSettings();
+    if (settings?.newUserCouponCode) {
+      // Ensure we don't overwrite if for some reason profile already has coupons (unlikely on create)
+      const existing = sanitizedProfile.ownedCoupons || [];
+      if (!existing.includes(settings.newUserCouponCode)) {
+        sanitizedProfile.ownedCoupons = [...existing, settings.newUserCouponCode];
+      }
+    }
+
+    await setDoc(doc(db, "users", uid), sanitizedProfile);
     return true;
   } catch (e) {
     console.error("Error creating user profile:", e);
     return false;
   }
+};
+
+export const subscribeToUserProfile = (uid: string, onUpdate: (profile: UserProfile | null) => void) => {
+  return onSnapshot(doc(db, "users", uid), (docSnap) => {
+    if (docSnap.exists()) {
+      onUpdate(docSnap.data() as UserProfile);
+    } else {
+      onUpdate(null);
+    }
+  }, (error) => {
+    console.error("Error subscribing to profile:", error);
+    onUpdate(null);
+  });
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
@@ -405,4 +513,4 @@ export const seedDatabase = async () => {
   }
 };
 
-export { app, analytics, auth };
+export { app, analytics, auth, ui };

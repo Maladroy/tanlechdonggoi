@@ -15,9 +15,10 @@ import type { Coupon } from "../types";
 interface Props {
   onBack: () => void;
   onGoToShop: () => void;
+  onApply: (code: string) => void;
 }
 
-export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
+export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop, onApply }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -109,12 +110,12 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
                         </p>
                       </div>
 
-                      <div className="pl-4 border-l border-white/20 border-dashed flex items-center">
+                      <div className="pl-4 border-l border-white/20 border-dashed flex flex-col gap-2 items-center">
                         <button
                           type="button"
                           onClick={() => !expired && handleCopy(coupon.code)}
                           disabled={expired}
-                          className={`bg-white text-gray-900 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition flex items-center gap-2 min-w-[100px] justify-center ${expired ? "cursor-not-allowed bg-gray-200 text-gray-500" : "hover:bg-gray-50 active:scale-95"}`}
+                          className={`w-full bg-white text-gray-900 px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition flex items-center justify-center gap-2 ${expired ? "cursor-not-allowed bg-gray-200 text-gray-500" : "hover:bg-gray-50 active:scale-95"}`}
                         >
                           {expired ? (
                             "Hết Hạn"
@@ -129,6 +130,16 @@ export const AICodeHunter: React.FC<Props> = ({ onBack, onGoToShop }) => {
                             </>
                           )}
                         </button>
+
+                        {!expired && (
+                          <button
+                            type="button"
+                            onClick={() => onApply(coupon.code)}
+                            className="w-full bg-black/20 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-black/30 transition flex items-center justify-center gap-2"
+                          >
+                            <Ticket size={16} /> Dùng Ngay
+                          </button>
+                        )}
                       </div>
                     </div>
 

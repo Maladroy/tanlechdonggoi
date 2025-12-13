@@ -16,8 +16,11 @@ import {
   getUserProfile,
   signOutUser,
   updateUserProfile,
+  subscribeToUserProfile,
+  getCategories,
 } from "./services/firebase";
-import type { CartItem, Combo, Coupon, UserProfile } from "./types";
+import type { Unsubscribe } from "firebase/firestore";
+import type { CartItem, Combo, Coupon, UserProfile, Category } from "./types";
 import { AppView } from "./types";
 import "./font.css";
 import "./style.css";
@@ -31,50 +34,79 @@ const App: React.FC = () => {
   // User State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   // Cart State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [_, setAppliedCode] = useState<string | null>(null);
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getCombos();
-      setCombos(data);
-      const couponData = await getCoupons();
+      const [comboData, couponData, categoryData] = await Promise.all([
+        getCombos(),
+        getCoupons(),
+        getCategories(),
+      ]);
+      setCombos(comboData);
       setCoupons(couponData);
+      setCategories(categoryData);
       setLoading(false);
     };
     fetchData();
 
     // Listen for Auth Changes
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeProfile: Unsubscribe | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // Unsubscribe from previous profile listener
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = undefined;
+      }
+
       if (firebaseUser) {
-        const profile = await getUserProfile(firebaseUser.uid);
-        if (profile) {
-          setUser(profile);
-          if (profile.isAdmin) {
-            setView(AppView.ADMIN);
+        // Subscribe to user profile
+        unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (profile) => {
+          if (profile) {
+            setUser(profile);
+            setIsNewUser(false);
+
+            // Handle View Transitions
+            if (profile.isAdmin) {
+              setView(AppView.ADMIN);
+            } else {
+              setView((prev) => {
+                // If currently in Auth or Admin, switch to Shop
+                if (prev === AppView.AUTH || prev === AppView.ADMIN) {
+                  return AppView.SHOP;
+                }
+                return prev;
+              });
+            }
           } else {
-            setView(AppView.SHOP);
+            // New user (or missing profile) -> Go to Auth/Register
+            setIsNewUser(true);
+            setUser(null);
+            setView(AppView.AUTH);
           }
-        } else {
-          setUser({
-            name: firebaseUser.displayName || "Khách hàng",
-            phone: "",
-          });
-          setView(AppView.SHOP);
-        }
+          setAuthLoading(false);
+        });
       } else {
+        setIsNewUser(false);
         setUser(null);
         setView(AppView.SHOP);
+        setAuthLoading(false);
       }
-      setAuthLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []); // Remove dependency on [view] to avoid infinite loops, but keep fetching data on mount
 
   // Auth Handlers
@@ -150,15 +182,9 @@ const App: React.FC = () => {
 
   // Coupon Logic
   const handleApplyCode = (code: string) => {
-    // In a real app we would validate against DB coupons
-    const validCodes = ["TANLECH50", "COMBOGIADINH", "BANMOI20", "FREESHIP"];
-    if (validCodes.includes(code.toUpperCase())) {
-      setAppliedCode(code.toUpperCase());
-      return true;
-    }
-    // Also allow new dynamic coupons
-    setAppliedCode(code.toUpperCase());
-    return true;
+    setAppliedCode(code);
+    setView(AppView.SHOP);
+    setIsCartOpen(true);
   };
 
   const renderView = () => {
@@ -174,6 +200,7 @@ const App: React.FC = () => {
       case AppView.AUTH:
         return (
           <AuthGate
+            isNewUser={isNewUser}
             onLoginSuccess={handleLogin}
             onGuestAccess={() => setView(AppView.SHOP)}
           />
@@ -187,6 +214,7 @@ const App: React.FC = () => {
           <AICodeHunter
             onBack={() => setView(AppView.SHOP)}
             onGoToShop={() => setView(AppView.SHOP)}
+            onApply={handleApplyCode}
           />
         );
 
@@ -196,7 +224,14 @@ const App: React.FC = () => {
             <PromoPopup />
             <Shop
               combos={combos}
-              onOpenHunter={() => setView(AppView.COUPON_LIST)}
+              categories={categories}
+              onOpenHunter={() => {
+                if (user) {
+                  setView(AppView.COUPON_LIST);
+                } else {
+                  setView(AppView.AUTH);
+                }
+              }}
               onAddToCart={addToCart}
               cartItemCount={cart.length}
               onOpenCart={() => setIsCartOpen(true)}
@@ -218,6 +253,7 @@ const App: React.FC = () => {
               onRemove={removeFromCart}
               onUpdateQuantity={updateQuantity}
               coupons={coupons}
+              initialCouponCode={appliedCode}
               onClearCart={clearCart}
               onOrderSuccess={handleOrderSuccess}
             />

@@ -1,8 +1,8 @@
 import { Edit, Plus, Trash2, XCircle } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
-import { addCombo, deleteCombo, updateCombo } from "../../services/firebase";
-import type { Combo, ComboStatus } from "../../types";
+import { useEffect, useState } from "react";
+import { addCombo, deleteCombo, updateCombo, getCategories } from "../../services/firebase";
+import type { Combo, ComboStatus, Category } from "../../types";
 
 interface Props {
     combos: Combo[];
@@ -12,6 +12,8 @@ interface Props {
 export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
     const [showAddCombo, setShowAddCombo] = useState(false);
     const [editingComboId, setEditingComboId] = useState<string | null>(null);
+    const [categories, setCategories] = useState<Category[]>([]);
+
     const [newCombo, setNewCombo] = useState<Partial<Combo>>({
         name: "",
         description: "",
@@ -20,16 +22,24 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
         imageUrl: "",
         tags: [],
         items: [],
+        category: "",
     });
     const [itemsInput, setItemsInput] = useState("");
+    const [tagsInput, setTagsInput] = useState("");
+
+    useEffect(() => {
+        getCategories().then(setCategories);
+    }, []);
 
     const handleSaveCombo = async (e: React.FormEvent) => {
         e.preventDefault();
         const items = itemsInput.split(",").map((i) => i.trim());
+        const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+
         const comboData = {
             ...(newCombo as Omit<Combo, "id">),
             items,
-            tags: newCombo.tags?.length ? newCombo.tags : ["Mới"],
+            tags: tags.length ? tags : ["Mới"],
             status: newCombo.status || "available",
         };
 
@@ -46,6 +56,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
     const openEditCombo = (combo: Combo) => {
         setNewCombo(combo);
         setItemsInput(combo.items.join(", "));
+        setTagsInput(combo.tags.join(", "));
         setEditingComboId(combo.id);
         setShowAddCombo(true);
     };
@@ -62,8 +73,10 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
             tags: [],
             items: [],
             status: "available",
+            category: "",
         });
         setItemsInput("");
+        setTagsInput("");
     };
 
     const handleDeleteCombo = async (id: string) => {
@@ -92,9 +105,9 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                         <tr>
                             <th className="p-4 w-16">Ảnh</th>
                             <th className="p-4">Tên Combo</th>
+                            <th className="p-4">Danh Mục</th>
                             <th className="p-4">Trạng thái</th>
                             <th className="p-4 text-right">Giá Bán</th>
-                            <th className="p-4 text-right">Giá Gốc</th>
                             <th className="p-4 text-center">Thao Tác</th>
                         </tr>
                     </thead>
@@ -110,17 +123,24 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                                 </td>
                                 <td className="p-4">
                                     <div className="font-bold text-slate-800">{combo.name}</div>
-                                    <div className="text-xs text-slate-400 line-clamp-1">
-                                        {combo.description}
+                                    <div className="flex gap-1 mt-1 flex-wrap">
+                                        {combo.tags.map(tag => (
+                                            <span key={tag} className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200">
+                                                {tag}
+                                            </span>
+                                        ))}
                                     </div>
+                                </td>
+                                <td className="p-4">
+                                    {categories.find(c => c.id === combo.category)?.name || combo.category || "-"}
                                 </td>
                                 <td className="p-4">
                                     <span
                                         className={`text-xs font-bold px-2 py-1 rounded uppercase ${combo.status === "out_of_stock"
-                                                ? "bg-red-100 text-red-700"
-                                                : combo.status === "hidden"
-                                                    ? "bg-gray-100 text-gray-600"
-                                                    : "bg-green-100 text-green-700"
+                                            ? "bg-red-100 text-red-700"
+                                            : combo.status === "hidden"
+                                                ? "bg-gray-100 text-gray-600"
+                                                : "bg-green-100 text-green-700"
                                             }`}
                                     >
                                         {combo.status === "out_of_stock"
@@ -132,11 +152,6 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                                 </td>
                                 <td className="p-4 text-right font-bold text-orange-600">
                                     {combo.price.toLocaleString()}đ
-                                </td>
-                                <td className="p-4 text-right text-slate-400 line-through">
-                                    {combo.originalPrice > 0
-                                        ? `${combo.originalPrice.toLocaleString()}đ`
-                                        : "-"}
                                 </td>
                                 <td className="p-4 text-center">
                                     <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -196,6 +211,54 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                                     }
                                 />
                             </div>
+
+                            <div className="flex gap-4">
+                                <div className="w-1/2">
+                                    <label
+                                        htmlFor="combo-category"
+                                        className="block text-sm font-bold text-slate-700 mb-1"
+                                    >
+                                        Danh Mục
+                                    </label>
+                                    <select
+                                        id="combo-category"
+                                        className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        value={newCombo.category || ""}
+                                        onChange={(e) =>
+                                            setNewCombo({ ...newCombo, category: e.target.value })
+                                        }
+                                    >
+                                        <option value="">-- Chọn danh mục --</option>
+                                        {categories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="w-1/2">
+                                    <label
+                                        htmlFor="combo-status"
+                                        className="block text-sm font-bold text-slate-700 mb-1"
+                                    >
+                                        Trạng thái
+                                    </label>
+                                    <select
+                                        id="combo-status"
+                                        className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        value={newCombo.status || "available"}
+                                        onChange={(e) =>
+                                            setNewCombo({
+                                                ...newCombo,
+                                                status: e.target.value as ComboStatus,
+                                            })
+                                        }
+                                    >
+                                        <option value="available">Sẵn sàng bán</option>
+                                        <option value="out_of_stock">Hết hàng</option>
+                                        <option value="hidden">Ẩn khỏi shop</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div>
                                 <label
                                     htmlFor="combo-desc"
@@ -217,6 +280,23 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                                     }
                                 />
                             </div>
+
+                            <div>
+                                <label
+                                    htmlFor="combo-tags"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    Tags (phân cách dấu phẩy)
+                                </label>
+                                <input
+                                    id="combo-tags"
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={tagsInput}
+                                    placeholder="Ví dụ: Hot, Mới, Giảm giá"
+                                    onChange={(e) => setTagsInput(e.target.value)}
+                                />
+                            </div>
+
                             <div className="flex gap-4">
                                 <div className="w-1/2">
                                     <label
@@ -295,29 +375,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
                                     onChange={(e) => setItemsInput(e.target.value)}
                                 />
                             </div>
-                            <div>
-                                <label
-                                    htmlFor="combo-status"
-                                    className="block text-sm font-bold text-slate-700 mb-1"
-                                >
-                                    Trạng thái
-                                </label>
-                                <select
-                                    id="combo-status"
-                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                                    value={newCombo.status || "available"}
-                                    onChange={(e) =>
-                                        setNewCombo({
-                                            ...newCombo,
-                                            status: e.target.value as ComboStatus,
-                                        })
-                                    }
-                                >
-                                    <option value="available">Sẵn sàng bán</option>
-                                    <option value="out_of_stock">Hết hàng</option>
-                                    <option value="hidden">Ẩn khỏi shop</option>
-                                </select>
-                            </div>
+
                             <div className="flex gap-4 mt-8 pt-4 border-t border-slate-100">
                                 <button
                                     type="button"

@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import type { Order, UserProfile } from "../../types";
@@ -90,53 +91,86 @@ export const AdminUsers: React.FC<Props> = ({ users, orders }) => {
         });
     }, [users, orders]);
 
+    const handleExportCSV = () => {
+        const headers = ["Tên,Số Điện Thoại,Loại Khách,Tổng Đơn,Tổng Chi Tiêu,Lần Cuối Mua"];
+        const rows = customerList.map(c => [
+            `"${c.name}"`,
+            `"${c.phone}"`,
+            c.type === "Loyal" ? "Khách Hàng Thân Thiết" : c.type === "Customer" ? "Khách Hàng" : "Khách Tiềm Năng",
+            c.totalOrders,
+            c.totalSpent,
+            c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString("vi-VN") : "Chưa mua"
+        ].join(","));
+
+        const csvContent = "\uFEFF" + [headers, ...rows].join("\n"); // Add BOM for Excel
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `danh_sach_khach_hang_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-                    <tr>
-                        <th className="p-4">Khách Hàng</th>
-                        <th className="p-4">Số Điện Thoại</th>
-                        <th className="p-4">Loại Khách</th>
-                        <th className="p-4 text-right">Tổng Đơn</th>
-                        <th className="p-4 text-right">Tổng Chi Tiêu</th>
-                        <th className="p-4">Lần Cuối Mua</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {customerList.map((customer) => (
-                        <tr key={customer.phone} className="hover:bg-slate-50">
-                            <td className="p-4 font-bold text-slate-800">{customer.name}</td>
-                            <td className="p-4 font-mono">{customer.phone}</td>
-                            <td className="p-4">
-                                <span
-                                    className={`px-2 py-1 rounded-full text-xs font-bold border ${customer.type === "Loyal"
+        <div>
+            <div className="flex justify-end mb-4">
+                <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 transition shadow-sm"
+                >
+                    <Download size={20} /> Xuất Excel/CSV
+                </button>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th className="p-4">Khách Hàng</th>
+                            <th className="p-4">Số Điện Thoại</th>
+                            <th className="p-4">Loại Khách</th>
+                            <th className="p-4 text-right">Tổng Đơn</th>
+                            <th className="p-4 text-right">Tổng Chi Tiêu</th>
+                            <th className="p-4">Lần Cuối Mua</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {customerList.map((customer) => (
+                            <tr key={customer.phone} className="hover:bg-slate-50">
+                                <td className="p-4 font-bold text-slate-800">{customer.name}</td>
+                                <td className="p-4 font-mono">{customer.phone}</td>
+                                <td className="p-4">
+                                    <span
+                                        className={`px-2 py-1 rounded-full text-xs font-bold border ${customer.type === "Loyal"
                                             ? "bg-orange-100 text-orange-700 border-orange-200"
                                             : customer.type === "Customer"
                                                 ? "bg-blue-100 text-blue-700 border-blue-200"
                                                 : "bg-gray-100 text-gray-700 border-gray-200"
-                                        }`}
-                                >
-                                    {customer.type === "Loyal"
-                                        ? "👑 Khách Hàng Thân Thiết"
-                                        : customer.type === "Customer"
-                                            ? "👤 Khách Hàng"
-                                            : "🛍️ Khách Tiềm Năng"}
-                                </span>
-                            </td>
-                            <td className="p-4 text-right">{customer.totalOrders}</td>
-                            <td className="p-4 text-right font-bold text-slate-700">
-                                {customer.totalSpent.toLocaleString()}đ
-                            </td>
-                            <td className="p-4 text-xs text-slate-500">
-                                {customer.lastOrderDate
-                                    ? new Date(customer.lastOrderDate).toLocaleDateString()
-                                    : "Chưa mua"}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                            }`}
+                                    >
+                                        {customer.type === "Loyal"
+                                            ? "👑 Khách Hàng Thân Thiết"
+                                            : customer.type === "Customer"
+                                                ? "👤 Khách Hàng"
+                                                : "🛍️ Khách Tiềm Năng"}
+                                    </span>
+                                </td>
+                                <td className="p-4 text-right">{customer.totalOrders}</td>
+                                <td className="p-4 text-right font-bold text-slate-700">
+                                    {customer.totalSpent.toLocaleString()}đ
+                                </td>
+                                <td className="p-4 text-xs text-slate-500">
+                                    {customer.lastOrderDate
+                                        ? new Date(customer.lastOrderDate).toLocaleDateString()
+                                        : "Chưa mua"}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };

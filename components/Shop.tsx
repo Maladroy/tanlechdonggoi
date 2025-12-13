@@ -1,10 +1,11 @@
 import { Clock, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
 import { useState, useMemo } from "react";
-import type { Combo, UserProfile } from "../types";
+import type { Combo, UserProfile, Category } from "../types";
 
 interface Props {
   combos: Combo[];
+  categories: Category[];
   onOpenHunter: () => void;
   onAddToCart: (combo: Combo) => void;
   cartItemCount: number;
@@ -15,6 +16,7 @@ interface Props {
 
 export const Shop: React.FC<Props> = ({
   combos,
+  categories,
   onOpenHunter,
   onAddToCart,
   cartItemCount,
@@ -25,7 +27,11 @@ export const Shop: React.FC<Props> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc">("default");
 
-  const categories = ["all", ...new Set(combos.map((c) => c.category).filter(Boolean) as string[])];
+  const categoryOptions = useMemo(() => {
+    const uniqueIds = new Set(combos.map((c) => c.category).filter(Boolean) as string[]);
+    const mapped = categories.filter((cat) => cat.id && uniqueIds.has(cat.id));
+    return [{ id: "all", name: "Tất cả danh mục" }, ...mapped];
+  }, [categories, combos]);
 
   const filteredCombos = useMemo(() => {
     let result = [...combos];
@@ -119,9 +125,8 @@ export const Shop: React.FC<Props> = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
             >
-              <option value="all">Tất cả danh mục</option>
-              {categories.filter(c => c !== "all").map(c => (
-                <option key={c} value={c}>{c}</option>
+              {categoryOptions.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
 

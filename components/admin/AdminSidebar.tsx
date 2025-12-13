@@ -1,9 +1,11 @@
-import { LogOut, Package, ShoppingCart, Tag, Users } from "lucide-react";
+import { Layers, LogOut, Package, Settings, ShoppingCart, Tag, Users } from "lucide-react";
 import type React from "react";
 
+export type AdminTab = "orders" | "combos" | "coupons" | "users" | "categories" | "settings";
+
 interface Props {
-    activeTab: "orders" | "combos" | "coupons" | "users";
-    setActiveTab: (tab: "orders" | "combos" | "coupons" | "users") => void;
+    activeTab: AdminTab;
+    setActiveTab: (tab: AdminTab) => void;
     onLogout: () => void;
 }
 
@@ -24,8 +26,8 @@ export const AdminSidebar: React.FC<Props> = ({
                     type="button"
                     onClick={() => setActiveTab("orders")}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "orders"
-                            ? "bg-orange-600 text-white"
-                            : "text-slate-400 hover:bg-slate-800"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
                         }`}
                 >
                     <ShoppingCart size={20} /> Đơn Hàng
@@ -34,18 +36,28 @@ export const AdminSidebar: React.FC<Props> = ({
                     type="button"
                     onClick={() => setActiveTab("combos")}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "combos"
-                            ? "bg-orange-600 text-white"
-                            : "text-slate-400 hover:bg-slate-800"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
                         }`}
                 >
                     <Package size={20} /> Quản Lý Combo
                 </button>
                 <button
                     type="button"
+                    onClick={() => setActiveTab("categories")}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "categories"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
+                        }`}
+                >
+                    <Layers size={20} /> Danh Mục
+                </button>
+                <button
+                    type="button"
                     onClick={() => setActiveTab("coupons")}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "coupons"
-                            ? "bg-orange-600 text-white"
-                            : "text-slate-400 hover:bg-slate-800"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
                         }`}
                 >
                     <Tag size={20} /> Mã Giảm Giá
@@ -54,11 +66,21 @@ export const AdminSidebar: React.FC<Props> = ({
                     type="button"
                     onClick={() => setActiveTab("users")}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "users"
-                            ? "bg-orange-600 text-white"
-                            : "text-slate-400 hover:bg-slate-800"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
                         }`}
                 >
                     <Users size={20} /> Khách Hàng
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab("settings")}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "settings"
+                        ? "bg-orange-600 text-white"
+                        : "text-slate-400 hover:bg-slate-800"
+                        }`}
+                >
+                    <Settings size={20} /> Cài Đặt
                 </button>
             </nav>
             <div className="p-4 border-t border-slate-700">
