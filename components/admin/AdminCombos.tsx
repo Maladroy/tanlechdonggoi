@@ -1,0 +1,342 @@
+import { Edit, Plus, Trash2, XCircle } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { addCombo, deleteCombo, updateCombo } from "../../services/firebase";
+import type { Combo, ComboStatus } from "../../types";
+
+interface Props {
+    combos: Combo[];
+    onRefresh: () => void;
+}
+
+export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
+    const [showAddCombo, setShowAddCombo] = useState(false);
+    const [editingComboId, setEditingComboId] = useState<string | null>(null);
+    const [newCombo, setNewCombo] = useState<Partial<Combo>>({
+        name: "",
+        description: "",
+        price: 0,
+        originalPrice: 0,
+        imageUrl: "",
+        tags: [],
+        items: [],
+    });
+    const [itemsInput, setItemsInput] = useState("");
+
+    const handleSaveCombo = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const items = itemsInput.split(",").map((i) => i.trim());
+        const comboData = {
+            ...(newCombo as Omit<Combo, "id">),
+            items,
+            tags: newCombo.tags?.length ? newCombo.tags : ["Mới"],
+            status: newCombo.status || "available",
+        };
+
+        if (editingComboId) {
+            await updateCombo(editingComboId, comboData);
+        } else {
+            await addCombo(comboData);
+        }
+
+        closeComboModal();
+        onRefresh();
+    };
+
+    const openEditCombo = (combo: Combo) => {
+        setNewCombo(combo);
+        setItemsInput(combo.items.join(", "));
+        setEditingComboId(combo.id);
+        setShowAddCombo(true);
+    };
+
+    const closeComboModal = () => {
+        setShowAddCombo(false);
+        setEditingComboId(null);
+        setNewCombo({
+            name: "",
+            description: "",
+            price: 0,
+            originalPrice: 0,
+            imageUrl: "",
+            tags: [],
+            items: [],
+            status: "available",
+        });
+        setItemsInput("");
+    };
+
+    const handleDeleteCombo = async (id: string) => {
+        if (confirm("Xóa combo này?")) {
+            await deleteCombo(id);
+            onRefresh();
+        }
+    };
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-lg text-slate-700">Danh Sách Sản Phẩm</h3>
+                <button
+                    type="button"
+                    onClick={() => setShowAddCombo(true)}
+                    className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-700 transition shadow-sm"
+                >
+                    <Plus size={20} /> Thêm Combo Mới
+                </button>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th className="p-4 w-16">Ảnh</th>
+                            <th className="p-4">Tên Combo</th>
+                            <th className="p-4">Trạng thái</th>
+                            <th className="p-4 text-right">Giá Bán</th>
+                            <th className="p-4 text-right">Giá Gốc</th>
+                            <th className="p-4 text-center">Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {combos.map((combo) => (
+                            <tr key={combo.id} className="hover:bg-slate-50 group">
+                                <td className="p-4">
+                                    <img
+                                        src={combo.imageUrl}
+                                        alt=""
+                                        className="w-10 h-10 object-cover rounded bg-slate-100"
+                                    />
+                                </td>
+                                <td className="p-4">
+                                    <div className="font-bold text-slate-800">{combo.name}</div>
+                                    <div className="text-xs text-slate-400 line-clamp-1">
+                                        {combo.description}
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <span
+                                        className={`text-xs font-bold px-2 py-1 rounded uppercase ${combo.status === "out_of_stock"
+                                                ? "bg-red-100 text-red-700"
+                                                : combo.status === "hidden"
+                                                    ? "bg-gray-100 text-gray-600"
+                                                    : "bg-green-100 text-green-700"
+                                            }`}
+                                    >
+                                        {combo.status === "out_of_stock"
+                                            ? "Hết hàng"
+                                            : combo.status === "hidden"
+                                                ? "Ẩn"
+                                                : "Sẵn sàng"}
+                                    </span>
+                                </td>
+                                <td className="p-4 text-right font-bold text-orange-600">
+                                    {combo.price.toLocaleString()}đ
+                                </td>
+                                <td className="p-4 text-right text-slate-400 line-through">
+                                    {combo.originalPrice > 0
+                                        ? `${combo.originalPrice.toLocaleString()}đ`
+                                        : "-"}
+                                </td>
+                                <td className="p-4 text-center">
+                                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditCombo(combo)}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                                            title="Sửa"
+                                        >
+                                            <Edit size={16} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteCombo(combo.id)}
+                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                            title="Xóa"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Add/Edit Combo Modal */}
+            {showAddCombo && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h3 className="text-xl font-bold mb-6 flex justify-between items-center">
+                            {editingComboId ? "Cập Nhật Combo" : "Thêm Combo Mới"}
+                            <button
+                                type="button"
+                                onClick={closeComboModal}
+                                className="text-slate-400 hover:text-slate-600"
+                            >
+                                <XCircle size={24} />
+                            </button>
+                        </h3>
+                        <form onSubmit={handleSaveCombo} className="space-y-4">
+                            <div>
+                                <label
+                                    htmlFor="combo-name"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    Tên Combo
+                                </label>
+                                <input
+                                    id="combo-name"
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={newCombo.name}
+                                    onChange={(e) =>
+                                        setNewCombo({ ...newCombo, name: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    htmlFor="combo-desc"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    Mô tả
+                                </label>
+                                <textarea
+                                    id="combo-desc"
+                                    required
+                                    rows={3}
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={newCombo.description}
+                                    onChange={(e) =>
+                                        setNewCombo({
+                                            ...newCombo,
+                                            description: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-1/2">
+                                    <label
+                                        htmlFor="combo-price"
+                                        className="block text-sm font-bold text-slate-700 mb-1"
+                                    >
+                                        Giá bán
+                                    </label>
+                                    <input
+                                        id="combo-price"
+                                        required
+                                        type="number"
+                                        className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        value={newCombo.price || ""}
+                                        onChange={(e) =>
+                                            setNewCombo({
+                                                ...newCombo,
+                                                price: Number(e.target.value),
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div className="w-1/2">
+                                    <label
+                                        htmlFor="combo-original-price"
+                                        className="block text-sm font-bold text-slate-700 mb-1"
+                                    >
+                                        Giá gốc (Tùy chọn)
+                                    </label>
+                                    <input
+                                        id="combo-original-price"
+                                        type="number"
+                                        className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                        value={newCombo.originalPrice || ""}
+                                        onChange={(e) =>
+                                            setNewCombo({
+                                                ...newCombo,
+                                                originalPrice: Number(e.target.value),
+                                            })
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label
+                                    htmlFor="combo-image"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    URL Hình ảnh
+                                </label>
+                                <input
+                                    id="combo-image"
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={newCombo.imageUrl}
+                                    onChange={(e) =>
+                                        setNewCombo({
+                                            ...newCombo,
+                                            imageUrl: e.target.value,
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    htmlFor="combo-items"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    Danh sách món (phân cách bằng dấu phẩy)
+                                </label>
+                                <input
+                                    id="combo-items"
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={itemsInput}
+                                    onChange={(e) => setItemsInput(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    htmlFor="combo-status"
+                                    className="block text-sm font-bold text-slate-700 mb-1"
+                                >
+                                    Trạng thái
+                                </label>
+                                <select
+                                    id="combo-status"
+                                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                                    value={newCombo.status || "available"}
+                                    onChange={(e) =>
+                                        setNewCombo({
+                                            ...newCombo,
+                                            status: e.target.value as ComboStatus,
+                                        })
+                                    }
+                                >
+                                    <option value="available">Sẵn sàng bán</option>
+                                    <option value="out_of_stock">Hết hàng</option>
+                                    <option value="hidden">Ẩn khỏi shop</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-4 mt-8 pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={closeComboModal}
+                                    className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 transition shadow-lg shadow-orange-200"
+                                >
+                                    {editingComboId ? "Cập Nhật" : "Tạo Combo"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};

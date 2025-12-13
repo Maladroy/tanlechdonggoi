@@ -25,6 +25,8 @@ export interface Coupon {
 	applicableCombos?: string[]; // IDs of combos this coupon applies to
 	type?: "fixed" | "percent"; // Type of discount
 	value?: number; // Amount (e.g. 50000) or Percent (e.g. 15 for 15%)
+	isNewUserOnly?: boolean;
+	maxUsesPerUser?: number;
 }
 
 export interface CartItem extends Combo {
@@ -38,6 +40,7 @@ export interface UserProfile {
 	isAdmin?: boolean;
 	dob?: string;
 	gender?: "male" | "female" | "other";
+	usedCoupons?: string[]; // List of coupon codes used by this user
 }
 
 export interface Order {

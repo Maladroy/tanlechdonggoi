@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import {
   AlertCircle,
   CheckCircle,
+  Loader2,
   Minus,
   Phone,
   Plus,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { auth, createOrder } from "../services/firebase";
+import { auth, createOrder, getOrdersByUser } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
 
 interface Props {
@@ -40,6 +41,7 @@ export const Cart: React.FC<Props> = ({
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState("");
   const [couponInput, setCouponInput] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   // Form for Shipping Address
   const form = useForm({
@@ -73,7 +75,7 @@ export const Cart: React.FC<Props> = ({
         total: total,
         createdAt: new Date().toISOString(),
         status: "pending",
-        appliedCoupon: appliedCoupon ? appliedCoupon.code : null, // Fix: Firestore doesn't accept undefined
+        appliedCoupon: appliedCoupon ? appliedCoupon.code : undefined,
         shippingAddress: {
           street: value.address,
           city: value.city,
@@ -133,21 +135,30 @@ export const Cart: React.FC<Props> = ({
 
   const { discountAmount, total } = calculateTotal();
 
-  const handleApplyCoupon = () => {
+  const handleApplyCoupon = async () => {
     if (!couponInput) return;
-    const found = coupons.find(
-      (c) => c.code.toUpperCase() === couponInput.toUpperCase()
-    );
+    setIsValidatingCoupon(true);
+    setCouponError("");
 
-    if (found) {
-      // Basic validation
+    try {
+      const found = coupons.find(
+        (c) => c.code.toUpperCase() === couponInput.toUpperCase()
+      );
+
+      if (!found) {
+        setCouponError("Mã không tồn tại!");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      // 1. Check Expiry
       if (new Date(found.expiryDate) < new Date()) {
         setCouponError("Mã này đã hết hạn!");
         setAppliedCoupon(null);
         return;
       }
 
-      // Check if applicable
+      // 2. Check Applicable Combos
       if (found.applicableCombos && found.applicableCombos.length > 0) {
         const hasItem = cart.some(item => found.applicableCombos?.includes(item.id));
         if (!hasItem) {
@@ -157,12 +168,46 @@ export const Cart: React.FC<Props> = ({
         }
       }
 
+      // 3. User Specific Checks
+      if (user) {
+        // Check if already used
+        if (user.usedCoupons?.includes(found.code)) {
+          setCouponError("Bạn đã sử dụng mã này rồi!");
+          setAppliedCoupon(null);
+          return;
+        }
+
+        // Check "New User Only"
+        if (found.isNewUserOnly) {
+          // We check if user has any previous orders
+          const orders = await getOrdersByUser(auth.currentUser?.uid || "");
+          // Filter out cancelled orders? Maybe. 
+          // "New User" usually means first successful order.
+          const successfulOrders = orders.filter(o => o.status !== 'cancelled');
+
+          if (successfulOrders.length > 0) {
+            setCouponError("Mã này chỉ dành cho khách hàng mới lần đầu mua sắm!");
+            setAppliedCoupon(null);
+            return;
+          }
+        }
+      } else {
+        // Guest attempting to use restricted coupon
+        if (found.isNewUserOnly || found.maxUsesPerUser) {
+          setCouponError("Vui lòng đăng nhập để sử dụng mã này!");
+          setAppliedCoupon(null);
+          return;
+        }
+      }
+
       setAppliedCoupon(found);
-      setCouponError("");
       setCouponInput("");
-    } else {
-      setCouponError("Mã không tồn tại!");
-      setAppliedCoupon(null);
+
+    } catch (e) {
+      console.error(e);
+      setCouponError("Có lỗi xảy ra khi kiểm tra mã!");
+    } finally {
+      setIsValidatingCoupon(false);
     }
   };
 
@@ -312,14 +357,16 @@ export const Cart: React.FC<Props> = ({
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 uppercase"
                         value={couponInput}
                         onChange={(e) => setCouponInput(e.target.value)}
+                        disabled={isValidatingCoupon}
                       />
                     </div>
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
-                      className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800"
+                      disabled={isValidatingCoupon || !couponInput}
+                      className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 disabled:opacity-70 flex items-center gap-2"
                     >
-                      Áp dụng
+                      {isValidatingCoupon ? <Loader2 size={16} className="animate-spin" /> : "Áp dụng"}
                     </button>
                   </div>
                   {couponError && (

@@ -13,8 +13,11 @@ import {
   updateDoc,
   where,
   limit,
+  arrayUnion,
+  setDoc,
+  getDoc
 } from "firebase/firestore";
-import type { Combo, Coupon, Order, Promo } from "../types";
+import type { Combo, Coupon, Order, Promo, UserProfile } from "../types";
 
 // Firebase configuration from Vite environment variables
 const firebaseConfig: FirebaseOptions = {
@@ -76,10 +79,32 @@ export const getActivePromo = async (): Promise<Promo | null> => {
 export const createOrder = async (order: Order): Promise<boolean> => {
   try {
     await addDoc(collection(db, "orders"), order);
+
+    // If order has a coupon, mark it as used for the user
+    if (order.appliedCoupon && order.userId) {
+      const userRef = doc(db, "users", order.userId);
+      await updateDoc(userRef, {
+        usedCoupons: arrayUnion(order.appliedCoupon)
+      });
+    }
+
     return true;
   } catch (e) {
     console.error("Error creating order:", e);
     return false;
+  }
+};
+
+export const getOrdersByUser = async (userId: string): Promise<Order[]> => {
+  try {
+    const q = query(collection(db, "orders"), where("userId", "==", userId), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(
+      (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Order, "id">) }),
+    );
+  } catch (e) {
+    console.error("Error fetching user orders:", e);
+    return [];
   }
 };
 
@@ -193,9 +218,6 @@ export const updateCoupon = async (
 };
 
 // --- User Profile API ---
-
-import { setDoc, getDoc } from "firebase/firestore";
-import type { UserProfile } from "../types";
 
 export const createUserProfile = async (
   uid: string,
