@@ -13,7 +13,7 @@ export interface Combo {
 	category?: string;
 	link?: string; // Optional now as we use cart
 	coupon?: string; // Specific coupon code for this item
-	status?: ComboStatus
+	status?: ComboStatus;
 }
 
 export interface Category {

@@ -1,3 +1,5 @@
+import { onAuthStateChanged } from "firebase/auth";
+import type { Unsubscribe } from "firebase/firestore";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AdminDashboard } from "./components/AdminDashboard";
@@ -8,277 +10,281 @@ import { OrderSuccessModal } from "./components/OrderSuccessModal";
 import { ProfileModal } from "./components/ProfileModal";
 import { PromoPopup } from "./components/PromoPopup";
 import { Shop } from "./components/Shop";
-import { onAuthStateChanged } from "firebase/auth";
 import {
-  auth,
-  getCombos,
-  getCoupons,
-  getUserProfile,
-  signOutUser,
-  updateUserProfile,
-  subscribeToUserProfile,
-  getCategories,
+	auth,
+	getCategories,
+	getCombos,
+	getCoupons,
+	getUserProfile,
+	signOutUser,
+	subscribeToUserProfile,
+	updateUserProfile,
 } from "./services/firebase";
-import type { Unsubscribe } from "firebase/firestore";
-import type { CartItem, Combo, Coupon, UserProfile, Category } from "./types";
+import type { CartItem, Category, Combo, Coupon, UserProfile } from "./types";
 import { AppView } from "./types";
 import "./font.css";
 import "./style.css";
 
 const App: React.FC = () => {
-  const [view, setView] = useState<AppView>(AppView.AUTH);
-  const [combos, setCombos] = useState<Combo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState(true);
+	const [view, setView] = useState<AppView>(AppView.AUTH);
+	const [combos, setCombos] = useState<Combo[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [authLoading, setAuthLoading] = useState(true);
 
-  // User State
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
+	// User State
+	const [user, setUser] = useState<UserProfile | null>(null);
+	const [isProfileOpen, setIsProfileOpen] = useState(false);
+	const [isNewUser, setIsNewUser] = useState(false);
 
-  // Cart State
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [appliedCode, setAppliedCode] = useState<string | null>(null);
-  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+	// Cart State
+	const [isCartOpen, setIsCartOpen] = useState(false);
+	const [cart, setCart] = useState<CartItem[]>([]);
+	const [appliedCode, setAppliedCode] = useState<string | null>(null);
+	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+	const [coupons, setCoupons] = useState<Coupon[]>([]);
+	const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [comboData, couponData, categoryData] = await Promise.all([
-        getCombos(),
-        getCoupons(),
-        getCategories(),
-      ]);
-      setCombos(comboData);
-      setCoupons(couponData);
-      setCategories(categoryData);
-      setLoading(false);
-    };
-    fetchData();
+	useEffect(() => {
+		const fetchData = async () => {
+			const [comboData, couponData, categoryData] = await Promise.all([
+				getCombos(),
+				getCoupons(),
+				getCategories(),
+			]);
+			setCombos(comboData);
+			setCoupons(couponData);
+			setCategories(categoryData);
+			setLoading(false);
+		};
+		fetchData();
 
-    // Listen for Auth Changes
-    let unsubscribeProfile: Unsubscribe | undefined;
+		// Listen for Auth Changes
+		let unsubscribeProfile: Unsubscribe | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Unsubscribe from previous profile listener
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = undefined;
-      }
+		const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+			// Unsubscribe from previous profile listener
+			if (unsubscribeProfile) {
+				unsubscribeProfile();
+				unsubscribeProfile = undefined;
+			}
 
-      if (firebaseUser) {
-        // Subscribe to user profile
-        unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (profile) => {
-          if (profile) {
-            setUser(profile);
-            setIsNewUser(false);
+			if (firebaseUser) {
+				// Subscribe to user profile
+				unsubscribeProfile = subscribeToUserProfile(
+					firebaseUser.uid,
+					(profile) => {
+						if (profile) {
+							setUser(profile);
+							setIsNewUser(false);
 
-            // Handle View Transitions
-            if (profile.isAdmin) {
-              setView(AppView.ADMIN);
-            } else {
-              setView((prev) => {
-                // If currently in Auth or Admin, switch to Shop
-                if (prev === AppView.AUTH || prev === AppView.ADMIN) {
-                  return AppView.SHOP;
-                }
-                return prev;
-              });
-            }
-          } else {
-            // New user (or missing profile) -> Go to Auth/Register
-            setIsNewUser(true);
-            setUser(null);
-            setView(AppView.AUTH);
-          }
-          setAuthLoading(false);
-        });
-      } else {
-        setIsNewUser(false);
-        setUser(null);
-        setView(AppView.SHOP);
-        setAuthLoading(false);
-      }
-    });
+							// Handle View Transitions
+							if (profile.isAdmin) {
+								setView(AppView.ADMIN);
+							} else {
+								setView((prev) => {
+									// If currently in Auth or Admin, switch to Shop
+									if (prev === AppView.AUTH || prev === AppView.ADMIN) {
+										return AppView.SHOP;
+									}
+									return prev;
+								});
+							}
+						} else {
+							// New user (or missing profile) -> Go to Auth/Register
+							setIsNewUser(true);
+							setUser(null);
+							setView(AppView.AUTH);
+						}
+						setAuthLoading(false);
+					},
+				);
+			} else {
+				setIsNewUser(false);
+				setUser(null);
+				setView(AppView.SHOP);
+				setAuthLoading(false);
+			}
+		});
 
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeProfile) unsubscribeProfile();
-    };
-  }, []); // Remove dependency on [view] to avoid infinite loops, but keep fetching data on mount
+		return () => {
+			unsubscribeAuth();
+			if (unsubscribeProfile) unsubscribeProfile();
+		};
+	}, []); // Remove dependency on [view] to avoid infinite loops, but keep fetching data on mount
 
-  // Auth Handlers
-  const handleLogin = (userProfile: UserProfile) => {
-    setUser(userProfile);
-    if (userProfile.isAdmin) {
-      setView(AppView.ADMIN);
-    } else {
-      setView(AppView.SHOP);
-    }
-  };
+	// Auth Handlers
+	const handleLogin = (userProfile: UserProfile) => {
+		setUser(userProfile);
+		if (userProfile.isAdmin) {
+			setView(AppView.ADMIN);
+		} else {
+			setView(AppView.SHOP);
+		}
+	};
 
-  const handleLogout = async () => {
-    await signOutUser();
-    setUser(null);
-    setView(AppView.SHOP);
-    setCart([]);
-    setIsProfileOpen(false);
-  };
+	const handleLogout = async () => {
+		await signOutUser();
+		setUser(null);
+		setView(AppView.SHOP);
+		setCart([]);
+		setIsProfileOpen(false);
+	};
 
-  const handleUpdateProfile = async (data: Partial<UserProfile>) => {
-    if (user && auth.currentUser) {
-      const success = await updateUserProfile(auth.currentUser.uid, data);
-      if (success) {
-        setUser({ ...user, ...data });
-        return true;
-      }
-    }
-    return false;
-  };
+	const handleUpdateProfile = async (data: Partial<UserProfile>) => {
+		if (user && auth.currentUser) {
+			const success = await updateUserProfile(auth.currentUser.uid, data);
+			if (success) {
+				setUser({ ...user, ...data });
+				return true;
+			}
+		}
+		return false;
+	};
 
-  // Cart Handlers
-  const addToCart = (combo: Combo) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === combo.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === combo.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        );
-      }
-      return [...prev, { ...combo, quantity: 1 }];
-    });
-    setIsCartOpen(true);
-  };
+	// Cart Handlers
+	const addToCart = (combo: Combo) => {
+		setCart((prev) => {
+			const existing = prev.find((item) => item.id === combo.id);
+			if (existing) {
+				return prev.map((item) =>
+					item.id === combo.id
+						? { ...item, quantity: item.quantity + 1 }
+						: item,
+				);
+			}
+			return [...prev, { ...combo, quantity: 1 }];
+		});
+		setIsCartOpen(true);
+	};
 
-  const removeFromCart = (id: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+	const removeFromCart = (id: string) => {
+		setCart((prev) => prev.filter((item) => item.id !== id));
+	};
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const newQuantity = Math.max(1, item.quantity + delta);
-          return { ...item, quantity: newQuantity };
-        }
-        return item;
-      })
-    );
-  };
+	const updateQuantity = (id: string, delta: number) => {
+		setCart((prev) =>
+			prev.map((item) => {
+				if (item.id === id) {
+					const newQuantity = Math.max(1, item.quantity + delta);
+					return { ...item, quantity: newQuantity };
+				}
+				return item;
+			}),
+		);
+	};
 
-  const clearCart = () => {
-    setCart([]);
-    setAppliedCode(null);
-  };
+	const clearCart = () => {
+		setCart([]);
+		setAppliedCode(null);
+	};
 
-  const handleOrderSuccess = () => {
-    setIsCartOpen(false);
-    setIsSuccessOpen(true);
-  };
+	const handleOrderSuccess = () => {
+		setIsCartOpen(false);
+		setIsSuccessOpen(true);
+	};
 
-  // Coupon Logic
-  const handleApplyCode = (code: string) => {
-    setAppliedCode(code);
-    setView(AppView.SHOP);
-    setIsCartOpen(true);
-  };
+	// Coupon Logic
+	const handleApplyCode = (code: string) => {
+		setAppliedCode(code);
+		setView(AppView.SHOP);
+		setIsCartOpen(true);
+	};
 
-  const renderView = () => {
-    if (authLoading || (loading && view !== AppView.AUTH && view !== AppView.ADMIN)) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-        </div>
-      );
-    }
+	const renderView = () => {
+		if (
+			authLoading ||
+			(loading && view !== AppView.AUTH && view !== AppView.ADMIN)
+		) {
+			return (
+				<div className="min-h-screen flex items-center justify-center bg-gray-50">
+					<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+				</div>
+			);
+		}
 
-    switch (view) {
-      case AppView.AUTH:
-        return (
-          <AuthGate
-            isNewUser={isNewUser}
-            onLoginSuccess={handleLogin}
-            onGuestAccess={() => setView(AppView.SHOP)}
-          />
-        );
+		switch (view) {
+			case AppView.AUTH:
+				return (
+					<AuthGate
+						isNewUser={isNewUser}
+						onLoginSuccess={handleLogin}
+						onGuestAccess={() => setView(AppView.SHOP)}
+					/>
+				);
 
-      case AppView.ADMIN:
-        return <AdminDashboard onLogout={handleLogout} />;
+			case AppView.ADMIN:
+				return <AdminDashboard onLogout={handleLogout} />;
 
-      case AppView.COUPON_LIST:
-        return (
-          <AICodeHunter
-            onBack={() => setView(AppView.SHOP)}
-            onGoToShop={() => setView(AppView.SHOP)}
-            onApply={handleApplyCode}
-          />
-        );
+			case AppView.COUPON_LIST:
+				return (
+					<AICodeHunter
+						onBack={() => setView(AppView.SHOP)}
+						onGoToShop={() => setView(AppView.SHOP)}
+						onApply={handleApplyCode}
+					/>
+				);
 
-      default:
-        return (
-          <>
-            <PromoPopup />
-            <Shop
-              combos={combos}
-              categories={categories}
-              onOpenHunter={() => {
-                if (user) {
-                  setView(AppView.COUPON_LIST);
-                } else {
-                  setView(AppView.AUTH);
-                }
-              }}
-              onAddToCart={addToCart}
-              cartItemCount={cart.length}
-              onOpenCart={() => setIsCartOpen(true)}
-              user={user}
-              onOpenProfile={() => {
-                if (user) {
-                  setIsProfileOpen(true);
-                } else {
-                  setView(AppView.AUTH);
-                }
-              }}
-            />
+			default:
+				return (
+					<>
+						<PromoPopup />
+						<Shop
+							combos={combos}
+							categories={categories}
+							onOpenHunter={() => {
+								if (user) {
+									setView(AppView.COUPON_LIST);
+								} else {
+									setView(AppView.AUTH);
+								}
+							}}
+							onAddToCart={addToCart}
+							cartItemCount={cart.length}
+							onOpenCart={() => setIsCartOpen(true)}
+							user={user}
+							onOpenProfile={() => {
+								if (user) {
+									setIsProfileOpen(true);
+								} else {
+									setView(AppView.AUTH);
+								}
+							}}
+						/>
 
-            <Cart
-              isOpen={isCartOpen}
-              onClose={() => setIsCartOpen(false)}
-              cart={cart}
-              user={user}
-              onRemove={removeFromCart}
-              onUpdateQuantity={updateQuantity}
-              coupons={coupons}
-              initialCouponCode={appliedCode}
-              onClearCart={clearCart}
-              onOrderSuccess={handleOrderSuccess}
-            />
+						<Cart
+							isOpen={isCartOpen}
+							onClose={() => setIsCartOpen(false)}
+							cart={cart}
+							user={user}
+							onRemove={removeFromCart}
+							onUpdateQuantity={updateQuantity}
+							coupons={coupons}
+							initialCouponCode={appliedCode}
+							onClearCart={clearCart}
+							onOrderSuccess={handleOrderSuccess}
+						/>
 
-            <OrderSuccessModal
-              isOpen={isSuccessOpen}
-              onClose={() => setIsSuccessOpen(false)}
-              user={user}
-            />
+						<OrderSuccessModal
+							isOpen={isSuccessOpen}
+							onClose={() => setIsSuccessOpen(false)}
+							user={user}
+						/>
 
-            {user && (
-              <ProfileModal
-                user={user}
-                isOpen={isProfileOpen}
-                onClose={() => setIsProfileOpen(false)}
-                onUpdate={handleUpdateProfile}
-                onLogout={handleLogout}
-              />
-            )}
-          </>
-        );
-    }
-  };
+						{user && (
+							<ProfileModal
+								user={user}
+								isOpen={isProfileOpen}
+								onClose={() => setIsProfileOpen(false)}
+								onUpdate={handleUpdateProfile}
+								onLogout={handleLogout}
+							/>
+						)}
+					</>
+				);
+		}
+	};
 
-  return <>{renderView()}</>;
+	return <>{renderView()}</>;
 };
 
 export default App;

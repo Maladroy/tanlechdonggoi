@@ -1,7 +1,7 @@
-import { Clock, Plus, ShoppingCart, Tag } from "lucide-react";
+import { Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
-import { useState, useMemo } from "react";
-import type { Combo, UserProfile, Category } from "../types";
+import { useMemo, useState } from "react";
+import type { Category, Combo, UserProfile } from "../types";
 
 interface Props {
   combos: Combo[];
@@ -25,10 +25,14 @@ export const Shop: React.FC<Props> = ({
   onOpenProfile,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc">("default");
+  const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc">(
+    "default",
+  );
 
   const categoryOptions = useMemo(() => {
-    const uniqueIds = new Set(combos.map((c) => c.category).filter(Boolean) as string[]);
+    const uniqueIds = new Set(
+      combos.map((c) => c.category).filter(Boolean) as string[],
+    );
     const mapped = categories.filter((cat) => cat.id && uniqueIds.has(cat.id));
     return [{ id: "all", name: "Tất cả danh mục" }, ...mapped];
   }, [categories, combos]);
@@ -125,8 +129,10 @@ export const Shop: React.FC<Props> = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
             >
-              {categoryOptions.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              {categoryOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
 
@@ -151,7 +157,13 @@ export const Shop: React.FC<Props> = ({
               {/* Off Percentage Badge */}
               {combo.originalPrice > combo.price && (
                 <div className="absolute top-3 right-3 z-30 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md">
-                  -{Math.round(((combo.originalPrice - combo.price) / combo.originalPrice) * 100)}%
+                  -
+                  {Math.round(
+                    ((combo.originalPrice - combo.price) /
+                      combo.originalPrice) *
+                      100,
+                  )}
+                  %
                 </div>
               )}
 
@@ -238,7 +250,7 @@ export const Shop: React.FC<Props> = ({
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 py-8 bg-gray-100 text-center text-gray-400 text-sm rel-0 fixed bottom-0 w-full">
+      <footer className="mt-12 py-4 text-center text-gray-400 text-sm rel-0 fixed bottom-0 w-full">
         <p>© 2025 Tân Lếch Đóng Gói. Chỉ bán Combo, không bán lẻ.</p>
       </footer>
     </div>

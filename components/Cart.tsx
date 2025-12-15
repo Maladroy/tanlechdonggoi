@@ -1,661 +1,828 @@
 import { useForm } from "@tanstack/react-form";
 import {
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  Minus,
-  Phone,
-  Plus,
-  Ticket,
-  Trash2,
-  X,
+	AlertCircle,
+	ArrowLeft,
+	CheckCircle,
+	ChevronRight,
+	Loader2,
+	MapPin,
+	Minus,
+	Phone,
+	Plus,
+	ShoppingBag,
+	Ticket,
+	Trash2,
+	User,
+	X,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { auth, createOrder, getOrdersByUser } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
 
 interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  cart: CartItem[];
-  user: UserProfile | null;
-  onRemove: (id: string) => void;
-  onUpdateQuantity: (id: string, delta: number) => void;
-  coupons: Coupon[]; // List of available coupons from DB
-  initialCouponCode?: string | null;
-  onClearCart: () => void;
-  onOrderSuccess: () => void;
+	isOpen: boolean;
+	onClose: () => void;
+	cart: CartItem[];
+	user: UserProfile | null;
+	onRemove: (id: string) => void;
+	onUpdateQuantity: (id: string, delta: number) => void;
+	coupons: Coupon[];
+	initialCouponCode?: string | null;
+	onClearCart: () => void;
+	onOrderSuccess: () => void;
 }
 
+type CartStep = "cart" | "checkout";
+
 export const Cart: React.FC<Props> = ({
-  isOpen,
-  onClose,
-  cart,
-  user,
-  onRemove,
-  onUpdateQuantity,
-  coupons,
-  initialCouponCode,
-  onClearCart,
-  onOrderSuccess,
+	isOpen,
+	onClose,
+	cart,
+	user,
+	onRemove,
+	onUpdateQuantity,
+	coupons,
+	initialCouponCode,
+	onClearCart,
+	onOrderSuccess,
 }) => {
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [couponError, setCouponError] = useState("");
-  const [couponInput, setCouponInput] = useState("");
-  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
-  const [hasAutoApplied, setHasAutoApplied] = useState(false);
+	const [step, setStep] = useState<CartStep>("cart");
+	const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+	const [couponError, setCouponError] = useState("");
+	const [couponInput, setCouponInput] = useState("");
+	const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+	const [hasAutoApplied, setHasAutoApplied] = useState(false);
 
-  // Form for Shipping Address
-  const form = useForm({
-    defaultValues: {
-      name: user?.name || "",
-      phone: user?.phone || "",
-      address: "",
-      city: "",
-      zipCode: "",
-    },
-    onSubmit: async ({ value }) => {
-      const { total } = calculateTotal();
+	// Form logic
+	const form = useForm({
+		defaultValues: {
+			name: user?.name || "",
+			phone: user?.phone || "",
+			address: "",
+			city: "",
+			zipCode: "",
+		},
+		onSubmit: async ({ value }) => {
+			const { total } = calculateTotal();
+			let orderUser = user;
+			let userId = auth.currentUser?.uid;
 
-      let orderUser = user;
-      let userId = auth.currentUser?.uid;
+			if (!orderUser) {
+				orderUser = { name: value.name, phone: value.phone };
+				userId = "guest";
+			}
 
-      if (!orderUser) {
-        orderUser = {
-          name: value.name,
-          phone: value.phone,
-        };
-        userId = "guest";
-      }
+			if (!userId || !orderUser) return;
 
-      if (!userId || !orderUser) return;
+			const success = await createOrder({
+				userId: userId,
+				user: orderUser,
+				items: cart,
+				total: total,
+				createdAt: new Date().toISOString(),
+				status: "pending",
+				appliedCoupon: appliedCoupon ? appliedCoupon.code : undefined,
+				shippingAddress: {
+					street: value.address,
+					city: value.city,
+					zipCode: value.zipCode,
+				},
+			});
 
-      const success = await createOrder({
-        userId: userId,
-        user: orderUser,
-        items: cart,
-        total: total,
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        appliedCoupon: appliedCoupon ? appliedCoupon.code : undefined,
-        shippingAddress: {
-          street: value.address,
-          city: value.city,
-          zipCode: value.zipCode,
-        },
-      });
+			if (success) {
+				onClearCart();
+				onOrderSuccess();
+				setStep("cart"); // Reset step
+			}
+		},
+	});
 
-      if (success) {
-        onClearCart();
-        onOrderSuccess();
-      }
-    },
-  });
+	// Calculations
+	const subtotal = cart.reduce(
+		(sum, item) => sum + item.price * item.quantity,
+		0,
+	);
 
-  const subtotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+	const calculateDiscount = (
+		cartItems: CartItem[],
+		coupon: Coupon | null,
+		subTotal: number,
+	): number => {
+		if (!coupon) return 0;
+		if (new Date(coupon.expiryDate) < new Date()) return 0;
+		if (
+			coupon.applicableCombos?.length &&
+			!cartItems.some((item) => coupon.applicableCombos?.includes(item.id))
+		) {
+			return 0;
+		}
 
-  const calculateDiscount = (
-    cartItems: CartItem[],
-    coupon: Coupon | null
-  ): number => {
-    if (!coupon) return 0;
+		let discount = 0;
+		if (coupon.type === "percent" && coupon.value) {
+			discount = (subTotal * coupon.value) / 100;
+		} else if (coupon.type === "fixed" && coupon.value) {
+			discount = coupon.value;
+		}
+		return Math.min(discount, subTotal);
+	};
 
-    // Check expiry
-    if (new Date(coupon.expiryDate) < new Date()) return 0;
+	const calculateTotal = () => {
+		const discount = calculateDiscount(cart, appliedCoupon, subtotal);
+		return { discountAmount: discount, total: subtotal - discount };
+	};
 
-    // If coupon is restricted to specific combos, require at least one eligible item
-    if (coupon.applicableCombos && coupon.applicableCombos.length > 0) {
-      const hasEligibleItem = cartItems.some((item) =>
-        coupon.applicableCombos?.includes(item.id)
-      );
-      if (!hasEligibleItem) return 0;
-    }
+	const { discountAmount, total } = calculateTotal();
 
-    let discount = 0;
+	// Coupon Logic
+	const handleApplyCoupon = useCallback(
+		async (codeOverride?: string) => {
+			const code = codeOverride || couponInput;
+			if (!code) return;
+			setIsValidatingCoupon(true);
+			setCouponError("");
 
-    if (coupon.type === "percent" && coupon.value) {
-      discount = (subtotal * coupon.value) / 100;
-    } else if (coupon.type === "fixed" && coupon.value) {
-      discount = coupon.value;
-    }
+			try {
+				const found = coupons.find(
+					(c) => c.code.toUpperCase() === code.toUpperCase(),
+				);
+				if (!found) throw new Error("Mã không tồn tại!");
+				if (new Date(found.expiryDate) < new Date())
+					throw new Error("Mã này đã hết hạn!");
 
-    // Always apply coupon on the order subtotal (not per item)
-    return Math.min(discount, subtotal);
-  };
+				if (found.applicableCombos?.length) {
+					const hasItem = cart.some((item) =>
+						found.applicableCombos?.includes(item.id),
+					);
+					if (!hasItem) throw new Error("Mã không áp dụng cho sản phẩm này!");
+				}
 
-  const calculateTotal = () => {
-    const discount = calculateDiscount(cart, appliedCoupon);
-    return {
-      subtotal,
-      discountAmount: discount,
-      total: subtotal - discount,
-    };
-  };
+				if (user) {
+					if (user.usedCoupons?.includes(found.code))
+						throw new Error("Bạn đã dùng mã này rồi!");
+					if (found.isNewUserOnly) {
+						const orders = await getOrdersByUser(auth.currentUser?.uid || "");
+						if (orders.filter((o) => o.status !== "cancelled").length > 0) {
+							throw new Error("Mã chỉ dành cho khách mới!");
+						}
+					}
+				} else {
+					if (found.isNewUserOnly || found.maxUsesPerUser)
+						throw new Error("Vui lòng đăng nhập để dùng mã này!");
+				}
 
-  const { discountAmount, total } = calculateTotal();
+				setAppliedCoupon(found);
+				if (!codeOverride) setCouponInput("");
+			} catch (e: unknown) {
+				const error = e as Error;
+				setCouponError(error.message || "Lỗi kiểm tra mã");
+				setAppliedCoupon(null);
+			} finally {
+				setIsValidatingCoupon(false);
+			}
+		},
+		[couponInput, coupons, cart, user],
+	);
 
-  const handleApplyCoupon = useCallback(async (codeOverride?: string) => {
-    const code = codeOverride || couponInput;
-    if (!code) return;
-    setIsValidatingCoupon(true);
-    setCouponError("");
+	// Effects
+	useEffect(() => {
+		if (!isOpen) setHasAutoApplied(false);
+	}, [isOpen]);
 
-    try {
-      const found = coupons.find(
-        (c) => c.code.toUpperCase() === code.toUpperCase()
-      );
+	useEffect(() => {
+		const tryAutoApply = async () => {
+			if (
+				!(
+					isOpen &&
+					!appliedCoupon &&
+					!hasAutoApplied &&
+					user?.ownedCoupons?.length &&
+					cart.length > 0
+				)
+			)
+				return;
+			for (const code of user.ownedCoupons) {
+				if (user.usedCoupons?.includes(code)) continue;
+				await handleApplyCoupon(code);
+				if (appliedCoupon) break;
+			}
+			setHasAutoApplied(true);
+		};
+		tryAutoApply();
+	}, [isOpen, appliedCoupon, hasAutoApplied, user, cart, handleApplyCoupon]);
 
-      if (!found) {
-        setCouponError("Mã không tồn tại!");
-        setAppliedCoupon(null);
-        return;
-      }
+	useEffect(() => {
+		if (isOpen && initialCouponCode && !appliedCoupon) {
+			setCouponInput(initialCouponCode);
+			handleApplyCoupon(initialCouponCode);
+		}
+	}, [isOpen, initialCouponCode, appliedCoupon, handleApplyCoupon]);
 
-      // 1. Check Expiry
-      if (new Date(found.expiryDate) < new Date()) {
-        setCouponError("Mã này đã hết hạn!");
-        setAppliedCoupon(null);
-        return;
-      }
+	if (!isOpen) return null;
 
-      // 2. Check Applicable Combos
-      if (found.applicableCombos && found.applicableCombos.length > 0) {
-        const hasItem = cart.some(item => found.applicableCombos?.includes(item.id));
-        if (!hasItem) {
-          setCouponError("Mã này không áp dụng cho các sản phẩm trong giỏ!");
-          setAppliedCoupon(null);
-          return;
-        }
-      }
+	return (
+		<div className="fixed inset-0 z-50 flex justify-end">
+			{/* Overlay */}
+			<button
+				type="button"
+				onClick={onClose}
+				className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+				aria-label="Close cart"
+			/>
 
-      // 3. User Specific Checks
-      if (user) {
-        // Check if already used
-        if (user.usedCoupons?.includes(found.code)) {
-          setCouponError("Bạn đã sử dụng mã này rồi!");
-          setAppliedCoupon(null);
-          return;
-        }
+			{/* Slide-over Panel */}
+			<div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
+				{/* HEADER */}
+				<div className="p-4 bg-white border-b border-gray-100 flex justify-between items-center shrink-0 z-10">
+					<div className="flex items-center gap-3">
+						{step === "checkout" && (
+							<button
+								type="button"
+								onClick={() => setStep("cart")}
+								className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+							>
+								<ArrowLeft size={20} className="text-gray-600" />
+							</button>
+						)}
+						<h2 className="font-bold text-xl text-gray-800">
+							{step === "cart" ? `Giỏ Hàng (${cart.length})` : "Thanh Toán"}
+						</h2>
+					</div>
+					<button
+						type="button"
+						onClick={onClose}
+						className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors"
+					>
+						<X size={24} />
+					</button>
+				</div>
 
-        // Check "New User Only"
-        if (found.isNewUserOnly) {
-          // We check if user has any previous orders
-          const orders = await getOrdersByUser(auth.currentUser?.uid || "");
-          // Filter out cancelled orders? Maybe. 
-          // "New User" usually means first successful order.
-          const successfulOrders = orders.filter(o => o.status !== 'cancelled');
+				{/* BODY CONTENT - Scrollable Area */}
+				<div className="flex-1 overflow-y-auto bg-gray-50">
+					{cart.length === 0 ? (
+						<EmptyCartView onClose={onClose} />
+					) : (
+						<div className="p-4 space-y-4">
+							{/* STEP 1: CART LIST */}
+							{step === "cart" && (
+								<>
+									<div className="space-y-3">
+										{cart.map((item) => (
+											<CartItemRow
+												key={item.id}
+												item={item}
+												appliedCoupon={appliedCoupon}
+												onUpdateQuantity={onUpdateQuantity}
+												onRemove={onRemove}
+											/>
+										))}
+									</div>
 
-          if (successfulOrders.length > 0) {
-            setCouponError("Mã này chỉ dành cho khách hàng mới lần đầu mua sắm!");
-            setAppliedCoupon(null);
-            return;
-          }
-        }
-      } else {
-        // Guest attempting to use restricted coupon
-        if (found.isNewUserOnly || found.maxUsesPerUser) {
-          setCouponError("Vui lòng đăng nhập để sử dụng mã này!");
-          setAppliedCoupon(null);
-          return;
-        }
-      }
+									{/* Coupon Input Section */}
+									<div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+										<CouponSection
+											user={user}
+											appliedCoupon={appliedCoupon}
+											setAppliedCoupon={setAppliedCoupon}
+											couponInput={couponInput}
+											setCouponInput={setCouponInput}
+											isValidatingCoupon={isValidatingCoupon}
+											handleApplyCoupon={handleApplyCoupon}
+											couponError={couponError}
+										/>
+									</div>
+								</>
+							)}
 
-      setAppliedCoupon(found);
-      if (!codeOverride) setCouponInput("");
+							{/* STEP 2: CHECKOUT FORM */}
+							{step === "checkout" && (
+								<div className="animate-fade-in space-y-4">
+									{/* Mini Order Summary */}
+									<div className="bg-white p-4 rounded-xl border border-gray-200">
+										<div className="flex justify-between text-sm text-gray-500 mb-2">
+											<span>Tạm tính ({cart.length} món)</span>
+											<span>{subtotal.toLocaleString("vi-VN")}₫</span>
+										</div>
+										{discountAmount > 0 && (
+											<div className="flex justify-between text-sm text-green-600 mb-2">
+												<span>Giảm giá</span>
+												<span>-{discountAmount.toLocaleString("vi-VN")}₫</span>
+											</div>
+										)}
+										<div className="border-t border-dashed pt-2 flex justify-between font-bold text-gray-900">
+											<span>Tổng thanh toán</span>
+											<span className="text-orange-600">
+												{total.toLocaleString("vi-VN")}₫
+											</span>
+										</div>
+									</div>
 
-    } catch (e) {
-      console.error(e);
-      setCouponError("Có lỗi xảy ra khi kiểm tra mã!");
-    } finally {
-      setIsValidatingCoupon(false);
-    }
-  }, [couponInput, coupons, cart, user]);
+									{/* Shipping Form */}
+									<form
+										id="checkout-form"
+										onSubmit={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											form.handleSubmit();
+										}}
+										className="space-y-4"
+									>
+										<div className="bg-white p-4 rounded-xl border border-gray-200 space-y-4 shadow-sm">
+											<h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 pb-2 border-b border-gray-100">
+												<MapPin size={18} className="text-orange-600" />
+												Thông tin giao hàng
+											</h4>
 
-  // Reset auto-apply flag when cart opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      setHasAutoApplied(false);
-    }
-  }, [isOpen]);
+											{!user && (
+												<>
+													<FormField
+														field={form}
+														name="name"
+														placeholder="Họ và tên"
+														icon={<User size={16} />}
+														required
+													/>
+													<FormField
+														field={form}
+														name="phone"
+														placeholder="Số điện thoại"
+														type="tel"
+														icon={<Phone size={16} />}
+														required
+													/>
+												</>
+											)}
 
-  // Auto-apply logic for owned coupons: try all owned coupons until one is valid
-  useEffect(() => {
-    const tryAutoApply = async () => {
-      if (!(isOpen && !appliedCoupon && !hasAutoApplied && user?.ownedCoupons?.length && cart.length > 0)) {
-        return;
-      }
-      for (const code of user.ownedCoupons) {
-        if (user.usedCoupons?.includes(code)) continue;
-        await handleApplyCoupon(code);
-        if (appliedCoupon) break;
-      }
-      setHasAutoApplied(true);
-    };
-    tryAutoApply();
-  }, [isOpen, appliedCoupon, hasAutoApplied, user?.ownedCoupons, user?.usedCoupons, cart.length, handleApplyCoupon]);
+											{user && (
+												<div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 flex gap-2">
+													<User size={16} className="mt-0.5" />
+													<span>
+														Người nhận: <strong>{user.name}</strong> -{" "}
+														{user.phone}
+													</span>
+												</div>
+											)}
 
-  useEffect(() => {
-    if (isOpen && initialCouponCode && !appliedCoupon) {
-      setCouponInput(initialCouponCode);
-      handleApplyCoupon(initialCouponCode);
-    }
-  }, [isOpen, initialCouponCode, appliedCoupon, handleApplyCoupon]);
+											<FormField
+												field={form}
+												name="address"
+												placeholder="Địa chỉ (Số nhà, đường...)"
+												required
+											/>
 
-  if (!isOpen) return null;
+											<div className="flex gap-3">
+												<div className="flex-1">
+													{/* <FormField field={form} name="city" placeholder="Tỉnh / TP" required /> */}
+													<form.Field
+														name="city"
+														validators={{
+															onChange: ({ value }: { value: string }) => {
+																if (!value)
+																	return "Vui lòng nhập Tỉnh/Thành phố";
+																if (value.length < 2)
+																	return "Vui lòng nhập tỉnh/thành phố";
+																return undefined;
+															},
+														}}
+													>
+														{(field: any) => (
+															<div>
+																<select
+																	value={field.state.value}
+																	onBlur={field.handleBlur}
+																	onChange={(e) =>
+																		field.handleChange(e.target.value)
+																	}
+																	className={`w-full pl-3 pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
+																		field.state.meta.errors.length
+																			? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
+																			: "border-gray-200 bg-gray-50"
+																	}`}
+																>
+																	<option value="" disabled>
+																		Chọn Tỉnh / Thành phố
+																	</option>
+																	{provinces.map((prov) => (
+																		<option key={prov} value={prov}>
+																			{prov}
+																		</option>
+																	))}
+																</select>
+																{field.state.meta.errors.length > 0 && (
+																	<p className="text-[10px] text-red-500 mt-1 ml-1">
+																		{field.state.meta.errors[0]}
+																	</p>
+																)}
+															</div>
+														)}
+													</form.Field>
+												</div>
+												<div className="w-1/3">
+													<FormField
+														field={form}
+														name="zipCode"
+														placeholder="Zip"
+														required
+													/>
+												</div>
+											</div>
+										</div>
+									</form>
+								</div>
+							)}
+						</div>
+					)}
+				</div>
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
-        <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
-          <h2 className="font-bold text-xl text-gray-800">
-            Giỏ Hàng ({cart.length})
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-full transition"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
-          {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-              <ShoppingCartIcon />
-              <p>Chưa có gì đâu, ra lựa combo đi!</p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-orange-600 font-bold hover:underline"
-              >
-                Quay lại mua sắm
-              </button>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.id}
-                className="flex gap-4 p-3 border border-gray-100 rounded-xl bg-white shadow-sm"
-              >
-                <img
-                  src={item.imageUrl}
-                  alt={item.name}
-                  className="w-20 h-20 object-cover rounded-lg bg-gray-100"
-                />
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-800 text-sm line-clamp-1">
-                    {item.name}
-                  </h3>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className="font-bold text-orange-600">
-                      {item.price.toLocaleString("vi-VN")}₫
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center border border-gray-200 rounded-lg">
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(item.id, -1)}
-                          className="p-1 hover:bg-gray-100 rounded-l-lg text-gray-600 disabled:opacity-50"
-                          disabled={item.quantity <= 1}
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="text-sm font-bold text-gray-800 px-2 min-w-5 text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(item.id, 1)}
-                          className="p-1 hover:bg-gray-100 rounded-r-lg text-gray-600"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => onRemove(item.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  {/* Show if coupon applies to this specific item */}
-                  {appliedCoupon?.applicableCombos?.includes(item.id) && (
-                    <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      <Ticket size={12} />
-                      Được giảm giá bởi mã {appliedCoupon.code}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {cart.length > 0 && (
-          <div className="p-5 bg-white border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            {/* Coupon Section */}
-            <div className="mb-6">
-              {!user ? (
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-blue-800 text-sm">
-                  <p className="font-bold flex items-center gap-2">
-                    <AlertCircle size={16} />
-                    Đăng ký để dùng mã giảm giá!
-                  </p>
-                  <p className="mt-1 text-xs">
-                    Khách hàng mới sẽ nhận được coupon giảm <strong>20%</strong> cho đơn hàng đầu tiên.
-                  </p>
-                </div>
-              ) : appliedCoupon ? (
-                <div className="flex justify-between items-center bg-green-50 border border-green-200 p-3 rounded-lg text-green-800">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={18} />
-                    <span className="font-medium text-sm">
-                      Đã dùng: <strong>{appliedCoupon.code}</strong>
-                      <span className="block text-xs font-normal text-green-600">
-                        {appliedCoupon.desc}
-                      </span>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAppliedCoupon(null)}
-                    className="text-xs text-red-500 font-bold hover:underline"
-                  >
-                    Gỡ bỏ
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Ticket
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        size={18}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Nhập mã giảm giá"
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-orange-500 uppercase"
-                        value={couponInput}
-                        onChange={(e) => setCouponInput(e.target.value)}
-                        disabled={isValidatingCoupon}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyCoupon()}
-                      disabled={isValidatingCoupon || !couponInput}
-                      className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 disabled:opacity-70 flex items-center gap-2"
-                    >
-                      {isValidatingCoupon ? <Loader2 size={16} className="animate-spin" /> : "Áp dụng"}
-                    </button>
-                  </div>
-                  {couponError && (
-                    <p className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                      <AlertCircle size={12} /> {couponError}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Summary */}
-            <div className="space-y-2 text-sm text-gray-600 mb-4">
-              <div className="flex justify-between">
-                <span>Tạm tính</span>
-                <span>{subtotal.toLocaleString("vi-VN")}₫</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Giảm giá</span>
-                  <span>-{discountAmount.toLocaleString("vi-VN")}₫</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between items-end mb-4">
-              <span className="font-bold text-gray-900 text-lg">Tổng cộng</span>
-              <span className="font-black text-2xl text-orange-600">
-                {total.toLocaleString("vi-VN")}₫
-              </span>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                form.handleSubmit();
-              }}
-              className="space-y-4"
-            >
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-                <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                  <CheckCircle size={16} className="text-orange-600" />
-                  Thông tin giao hàng
-                </h4>
-
-                {!user ? (
-                  <div className="space-y-2 mb-4">
-                    <form.Field
-                      name="name"
-                      validators={{
-                        onChange: ({ value }) =>
-                          !value ? "Vui lòng nhập họ tên" : undefined,
-                      }}
-                    >
-                      {(field) => (
-                        <>
-                          <input
-                            type="text"
-                            placeholder="Họ và tên"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
-                              ? "border-red-500 bg-red-50"
-                              : "border-gray-300"
-                              }`}
-                          />
-                          {field.state.meta.errors.length > 0 && (
-                            <p className="text-xs text-red-500">
-                              {field.state.meta.errors.join(", ")}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </form.Field>
-
-                    <form.Field
-                      name="phone"
-                      validators={{
-                        onChange: ({ value }) =>
-                          !value ? "Vui lòng nhập số điện thoại" : undefined,
-                      }}
-                    >
-                      {(field) => (
-                        <>
-                          <input
-                            type="tel"
-                            placeholder="Số điện thoại"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
-                              ? "border-red-500 bg-red-50"
-                              : "border-gray-300"
-                              }`}
-                          />
-                          {field.state.meta.errors.length > 0 && (
-                            <p className="text-xs text-red-500">
-                              {field.state.meta.errors.join(", ")}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </form.Field>
-                  </div>
-                ) : (
-                  <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 flex items-start gap-2 mb-2">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                    <span>
-                      Người nhận: <strong>{user.name} - {user.phone}</strong>
-                    </span>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <form.Field
-                    name="address"
-                    validators={{
-                      onChange: ({ value }) =>
-                        !value ? "Vui lòng nhập địa chỉ" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <>
-                        <input
-                          type="text"
-                          aria-label="Địa chỉ chi tiết"
-                          autoComplete="on"
-                          placeholder="Địa chỉ chi tiết (Số nhà, đường...)"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
-                            ? "border-red-500 bg-red-50"
-                            : "border-gray-300"
-                            }`}
-                        />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-xs text-red-500">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </form.Field>
-
-                  <div className="flex gap-2">
-                    <form.Field
-                      name="city"
-                      validators={{
-                        onChange: ({ value }) =>
-                          !value ? "Nhập TP" : undefined,
-                      }}
-                    >
-                      {(field) => (
-                        <div className="flex-1">
-                          <input
-                            autoComplete="on"
-                            type="text"
-                            placeholder="Tỉnh / Thành phố"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
-                              ? "border-red-500 bg-red-50"
-                              : "border-gray-300"
-                              }`}
-                          />
-                        </div>
-                      )}
-                    </form.Field>
-
-                    <form.Field
-                      name="zipCode"
-                      validators={{
-                        onChange: ({ value }) =>
-                          !value ? "Nhập Zip" : undefined,
-                      }}
-                    >
-                      {(field) => (
-                        <div className="w-1/3">
-                          <input
-                            autoComplete="on"
-                            type="text"
-                            placeholder="Zipcode"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            className={`w-full p-2 border rounded-lg text-sm ${field.state.meta.errors.length
-                              ? "border-red-500 bg-red-50"
-                              : "border-gray-300"
-                              }`}
-                          />
-                        </div>
-                      )}
-                    </form.Field>
-                  </div>
-                </div>
-              </div>
-
-              {/* Call to Order Info */}
-              <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-orange-800">
-                  <Phone size={18} />
-                  <span className="text-sm font-bold">Gọi đặt mua:</span>
-                </div>
-                <a
-                  href="tel:0901234567"
-                  className="text-orange-600 font-black text-lg hover:underline"
-                >
-                  090.123.4567
-                </a>
-              </div>
-
-              <form.Subscribe
-                selector={(state) => [state.canSubmit, state.isSubmitting]}
-              >
-                {([canSubmit, isSubmitting]) => (
-                  <button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting}
-                    className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
-                      ? "opacity-80 cursor-not-allowed"
-                      : ""
-                      }`}
-                  >
-                    {isSubmitting ? "Đang xử lý..." : "Đặt Hàng Ngay"}
-                  </button>
-                )}
-              </form.Subscribe>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+				{/* FOOTER - Sticky Bottom */}
+				{cart.length > 0 && (
+					<div className="p-4 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
+						{step === "cart" ? (
+							// CART FOOTER
+							<div className="space-y-3">
+								<div className="flex justify-between items-end">
+									<div>
+										<p className="text-xs text-gray-500">Tổng cộng</p>
+										<p className="text-2xl font-black text-gray-900 leading-none">
+											{total.toLocaleString("vi-VN")}₫
+										</p>
+										{discountAmount > 0 && (
+											<p className="text-xs text-green-600 font-medium mt-1">
+												Đã tiết kiệm {discountAmount.toLocaleString("vi-VN")}₫
+											</p>
+										)}
+									</div>
+									<div className="text-right">
+										<p className="text-xs text-gray-400 mb-1">
+											Chưa bao gồm phí ship
+										</p>
+									</div>
+								</div>
+								<button
+									type="button"
+									onClick={() => setStep("checkout")}
+									className="w-full bg-gray-900 hover:bg-black text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+								>
+									Tiến hành đặt hàng <ChevronRight size={18} />
+								</button>
+							</div>
+						) : (
+							// CHECKOUT FOOTER
+							<div className="space-y-3">
+								<form.Subscribe
+									selector={(state) => [state.canSubmit, state.isSubmitting]}
+								>
+									{([canSubmit, isSubmitting]) => (
+										<button
+											type="submit"
+											form="checkout-form" // Links to the form ID above
+											disabled={!canSubmit || isSubmitting}
+											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${
+												!canSubmit || isSubmitting
+													? "opacity-70 cursor-not-allowed"
+													: ""
+											}`}
+										>
+											{isSubmitting ? (
+												<Loader2 size={20} className="animate-spin" />
+											) : (
+												"Xác nhận đặt hàng"
+											)}
+										</button>
+									)}
+								</form.Subscribe>
+								<button
+									type="button"
+									onClick={() => setStep("cart")}
+									className="w-full text-gray-500 text-sm font-medium hover:text-gray-800 py-2"
+								>
+									Quay lại giỏ hàng
+								</button>
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+		</div>
+	);
 };
 
-const ShoppingCartIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="64"
-    height="64"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="text-gray-200"
-  >
-    <title>Shopping Cart</title>
-    <circle cx="8" cy="21" r="1"></circle>
-    <circle cx="19" cy="21" r="1"></circle>
-    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path>
-  </svg>
+// --- Sub Components for cleaner code ---
+
+const EmptyCartView = ({ onClose }: { onClose: () => void }) => (
+	<div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4 p-8 text-center">
+		<div className="bg-gray-100 p-6 rounded-full">
+			<ShoppingBag size={48} className="text-gray-300" />
+		</div>
+		<div>
+			<h3 className="text-gray-900 font-bold text-lg">Giỏ hàng trống</h3>
+			<p className="text-sm mt-1">Chưa có gì đâu, ra lựa combo đi!</p>
+		</div>
+		<button
+			type="button"
+			onClick={onClose}
+			className="px-6 py-2 bg-white border border-gray-300 rounded-full text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+		>
+			Quay lại mua sắm
+		</button>
+	</div>
+);
+
+const CartItemRow = ({
+	item,
+	appliedCoupon,
+	onUpdateQuantity,
+	onRemove,
+}: any) => (
+	<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
+		<div className="relative w-20 h-20 shrink-0">
+			<img
+				src={item.imageUrl}
+				alt={item.name}
+				className="w-full h-full object-cover rounded-lg bg-gray-50"
+			/>
+			{appliedCoupon?.applicableCombos?.includes(item.id) && (
+				<div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-sm">
+					<Ticket size={10} />
+				</div>
+			)}
+		</div>
+		<div className="flex-1 flex flex-col justify-between min-w-0">
+			<div>
+				<h3 className="font-bold text-gray-800 text-sm truncate">
+					{item.name}
+				</h3>
+				<p className="text-orange-600 font-bold text-sm mt-0.5">
+					{item.price.toLocaleString("vi-VN")}₫
+				</p>
+			</div>
+			<div className="flex justify-between items-center gap-2">
+				<div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-200">
+					<button
+						type="button"
+						onClick={() => onUpdateQuantity(item.id, -1)}
+						disabled={item.quantity <= 1}
+						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all"
+					>
+						<Minus size={12} />
+					</button>
+					<span className="text-sm font-bold text-gray-800 w-6 text-center">
+						{item.quantity}
+					</span>
+					<button
+						type="button"
+						onClick={() => onUpdateQuantity(item.id, 1)}
+						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all"
+					>
+						<Plus size={12} />
+					</button>
+				</div>
+				<button
+					type="button"
+					onClick={() => onRemove(item.id)}
+					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+				>
+					<Trash2 size={16} />
+				</button>
+			</div>
+		</div>
+	</div>
+);
+
+const CouponSection = ({
+	user,
+	appliedCoupon,
+	setAppliedCoupon,
+	couponInput,
+	setCouponInput,
+	isValidatingCoupon,
+	handleApplyCoupon,
+	couponError,
+}: any) => {
+	if (!user) {
+		return (
+			<div className="flex gap-3 items-start text-sm">
+				<div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+					<AlertCircle size={20} />
+				</div>
+				<div>
+					<p className="font-bold text-gray-800">Đăng nhập để giảm giá</p>
+					<p className="text-gray-500 text-xs mt-1">
+						Thành viên mới giảm 20% cho đơn đầu tiên.
+					</p>
+				</div>
+			</div>
+		);
+	}
+
+	if (appliedCoupon) {
+		return (
+			<div className="flex justify-between items-center bg-green-50 border border-green-200 p-3 rounded-lg text-green-800">
+				<div className="flex items-center gap-2 overflow-hidden">
+					<CheckCircle size={18} className="shrink-0" />
+					<div className="truncate">
+						<span className="font-bold text-sm block">
+							{appliedCoupon.code}
+						</span>
+						<span className="text-xs text-green-600 truncate block">
+							{appliedCoupon.desc}
+						</span>
+					</div>
+				</div>
+				<button
+					type="button"
+					onClick={() => setAppliedCoupon(null)}
+					className="shrink-0 text-xs bg-white px-2 py-1 rounded border border-green-200 hover:border-red-300 hover:text-red-500 transition"
+				>
+					Gỡ
+				</button>
+			</div>
+		);
+	}
+
+	return (
+		<div>
+			<label
+				htmlFor="coupon-input"
+				className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block"
+			>
+				Mã giảm giá
+			</label>
+			<div className="flex gap-2">
+				<div className="relative flex-1">
+					<Ticket
+						className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+						size={16}
+					/>
+					<input
+						id="coupon-input"
+						type="text"
+						placeholder="NHAPMA"
+						className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent uppercase transition-all"
+						value={couponInput}
+						onChange={(e) => setCouponInput(e.target.value)}
+						disabled={isValidatingCoupon}
+					/>
+				</div>
+				<button
+					type="button"
+					onClick={() => handleApplyCoupon()}
+					disabled={isValidatingCoupon || !couponInput}
+					className="bg-gray-900 text-white px-4 rounded-lg text-sm font-bold hover:bg-black disabled:opacity-70 transition-colors"
+				>
+					{isValidatingCoupon ? (
+						<Loader2 size={16} className="animate-spin" />
+					) : (
+						"Áp dụng"
+					)}
+				</button>
+			</div>
+			{couponError && (
+				<p className="text-red-500 text-xs mt-2 flex items-center gap-1">
+					<AlertCircle size={12} /> {couponError}
+				</p>
+			)}
+		</div>
+	);
+};
+
+const fieldMap = {
+	name: "Tên",
+	phone: "Số điện thoại",
+	city: "Tỉnh/Thành phố",
+	address: "Địa chỉ",
+	zipCode: "Mã zip",
+};
+
+const provinces = [
+	"Hà Nội",
+	"TP Hồ Chí Minh",
+	"Đà Nẵng",
+	"Hải Phòng",
+	"Cần Thơ",
+	"An Giang",
+	"Bình Dương",
+	"Bình Phước",
+	"Bình Thuận",
+	"Bình Định",
+	"Bà Rịa - Vũng Tàu",
+	"Cà Mau",
+	"Đắk Lắk",
+	"Đắk Nông",
+	"Điện Biên",
+	"Gia Lai",
+	"Hà Giang",
+	"Hà Nam",
+	"Hà Tĩnh",
+	"Hải Dương",
+	"Hậu Giang",
+	"Hòa Bình",
+	"Hưng Yên",
+	"Khánh Hòa",
+	"Kiên Giang",
+	"Kon Tum",
+	"Lai Châu",
+	"Lâm Đồng",
+	"Lạng Sơn",
+	"Lào Cai",
+	"Long An",
+	"Nam Định",
+	"Nghệ An",
+	"Ninh Bình",
+	"Ninh Thuận",
+	"Phú Thọ",
+	"Phú Yên",
+	"Quảng Bình",
+	"Quảng Nam",
+	"Quảng Ngãi",
+	"Quảng Ninh",
+	"Quảng Trị",
+	"Sóc Trăng",
+	"Sơn La",
+	"Tây Ninh",
+	"Thái Bình",
+	"Thái Nguyên",
+	"Thanh Hóa",
+	"Thừa Thiên Huế",
+	"Tiền Giang",
+	"Trà Vinh",
+	"Tuyên Quang",
+	"Vĩnh Long",
+	"Vĩnh Phúc",
+	"Yên Bái",
+] as const;
+
+// Helper for form fields to clean up main render
+const FormField = ({
+	field: formHook,
+	name,
+	placeholder,
+	type = "text",
+	required,
+	icon,
+}: any) => (
+	<formHook.Field
+		name={name}
+		validators={{
+			onChange: ({ value }: { value: string }) => {
+				console.log(name);
+				if (name === "zipCode" && value && !/^\d{0,6}$/.test(value)) {
+					return "Mã zip không hợp lệ";
+				}
+				// Phone validation for Vietnam numbers. Number starts with 0 or +84 followed by +9 (Can be more) digits starting with 3,5,7,8,9
+				if (
+					name === "phone" &&
+					value &&
+					!/(?:\+84|0084|0)[235789][0-9]{1,2}[0-9]{7}(?:[^\d]+|$)/g.test(value)
+				) {
+					return "Số điện thoại không hợp lệ";
+				}
+
+				if (name === "name" && value && value.length < 3) {
+					return "Tên quá ngắn";
+				}
+				if (name === "city" && value && value.length < 2) {
+					return "Vui lòng nhập tỉnh/thành phố";
+				}
+
+				const fieldName =
+					fieldMap[name as keyof typeof fieldMap] || "Trường này";
+				return required && !value ? `Vui lòng nhập ${fieldName}` : undefined;
+			},
+			onBlur: ({ value }: { value: string }) => {
+				const fieldName =
+					fieldMap[name as keyof typeof fieldMap] || "Trường này";
+				return required && !value ? `Vui lòng nhập ${fieldName}` : undefined;
+			},
+		}}
+	>
+		{(field: any) => (
+			<div>
+				<div className="relative">
+					{icon && (
+						<div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+							{icon}
+						</div>
+					)}
+					<input
+						type={type}
+						placeholder={placeholder}
+						value={field.state.value}
+						onBlur={field.handleBlur}
+						onChange={(e) => field.handleChange(e.target.value)}
+						className={`w-full ${icon ? "pl-9" : "pl-3"} pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
+							field.state.meta.errors.length
+								? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
+								: "border-gray-200 bg-gray-50"
+						}`}
+					/>
+				</div>
+				{field.state.meta.errors.length > 0 && (
+					<p className="text-[10px] text-red-500 mt-1 ml-1">
+						{field.state.meta.errors[0]}
+					</p>
+				)}
+			</div>
+		)}
+	</formHook.Field>
 );

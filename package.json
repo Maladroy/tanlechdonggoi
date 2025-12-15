@@ -1,38 +1,42 @@
 {
-  "name": "tanlechdonggoi",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "craft": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@firebase-oss/ui-react": "^7.0.0-beta",
-    "@google/genai": "^1.31.0",
-    "@tailwindcss/vite": "^4.1.17",
-    "@tanstack/react-form": "^1.27.2",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vercel/analytics": "^1.6.1",
-    "@vercel/speed-insights": "^1.3.1",
-    "firebase": "^12.6.0",
-    "lucide-react": "^0.556.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "tailwindcss": "^4.1.17"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.3.8",
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "vite-plugin-bundle-obfuscator": "^1.8.0"
-  },
-  "trustedDependencies": [
-    "@firebase/util",
-    "protobufjs"
-  ]
+	"name": "tanlechdonggoi",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"craft": "vite build",
+		"preview": "vite preview",
+		"lint": "biome check",
+		"format": "biome format",
+		"format:fix": "biome format --write",
+		"lint:fix": "biome check --fix"
+	},
+	"dependencies": {
+		"@firebase-oss/ui-react": "^7.0.0-beta",
+		"@google/genai": "^1.31.0",
+		"@tailwindcss/vite": "^4.1.17",
+		"@tanstack/react-form": "^1.27.2",
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"@vercel/analytics": "^1.6.1",
+		"@vercel/speed-insights": "^1.3.1",
+		"firebase": "^12.6.0",
+		"lucide-react": "^0.556.0",
+		"react": "^19.2.1",
+		"react-dom": "^19.2.1",
+		"tailwindcss": "^4.1.17"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.3.8",
+		"@types/node": "^22.14.0",
+		"@vitejs/plugin-react": "^5.0.0",
+		"typescript": "~5.8.2",
+		"vite": "^6.2.0",
+		"vite-plugin-bundle-obfuscator": "^1.8.0"
+	},
+	"trustedDependencies": [
+		"@firebase/util",
+		"protobufjs"
+	]
 }
