@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@firebase-oss/ui-styles/tailwind";
 body {
 	font-family: "Be Vietnam Pro", sans-serif;
 }

@@ -1,4 +1,3 @@
-import { initializeUI } from "@firebase-oss/ui-core";
 import { getAnalytics } from "firebase/analytics";
 import { type FirebaseOptions, initializeApp } from "firebase/app";
 import { getAuth, signOut } from "firebase/auth";
@@ -46,10 +45,6 @@ const auth = getAuth(app);
 
 auth.languageCode = "vi"; // Set auth UI language to Vietnamese
 
-const ui = initializeUI({
-	app,
-	auth,
-});
 const db = getFirestore(app);
 
 // Optional analytics (only in browser and when measurementId is provided)
@@ -548,4 +543,4 @@ export const seedDatabase = async () => {
 	}
 };
 
-export { app, analytics, auth, ui };
+export { app, analytics, auth };

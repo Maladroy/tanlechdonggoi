@@ -31,6 +31,7 @@ interface Props {
 	initialCouponCode?: string | null;
 	onClearCart: () => void;
 	onOrderSuccess: () => void;
+	onLoginRedirect: () => void;
 }
 
 type CartStep = "cart" | "checkout";
@@ -46,6 +47,7 @@ export const Cart: React.FC<Props> = ({
 	initialCouponCode,
 	onClearCart,
 	onOrderSuccess,
+	onLoginRedirect,
 }) => {
 	const [step, setStep] = useState<CartStep>("cart");
 	const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -289,6 +291,7 @@ export const Cart: React.FC<Props> = ({
 											isValidatingCoupon={isValidatingCoupon}
 											handleApplyCoupon={handleApplyCoupon}
 											couponError={couponError}
+											onLoginRedirect={onLoginRedirect}
 										/>
 									</div>
 								</>
@@ -393,11 +396,10 @@ export const Cart: React.FC<Props> = ({
 																	onChange={(e) =>
 																		field.handleChange(e.target.value)
 																	}
-																	className={`w-full pl-3 pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
-																		field.state.meta.errors.length
+																	className={`w-full pl-3 pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${field.state.meta.errors.length
 																			? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
 																			: "border-gray-200 bg-gray-50"
-																	}`}
+																		}`}
 																>
 																	<option value="" disabled>
 																		Chọn Tỉnh / Thành phố
@@ -477,11 +479,10 @@ export const Cart: React.FC<Props> = ({
 											type="submit"
 											form="checkout-form" // Links to the form ID above
 											disabled={!canSubmit || isSubmitting}
-											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${
-												!canSubmit || isSubmitting
+											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
 													? "opacity-70 cursor-not-allowed"
 													: ""
-											}`}
+												}`}
 										>
 											{isSubmitting ? (
 												<Loader2 size={20} className="animate-spin" />
@@ -598,6 +599,7 @@ const CouponSection = ({
 	isValidatingCoupon,
 	handleApplyCoupon,
 	couponError,
+	onLoginRedirect,
 }: any) => {
 	if (!user) {
 		return (
@@ -606,7 +608,13 @@ const CouponSection = ({
 					<AlertCircle size={20} />
 				</div>
 				<div>
-					<p className="font-bold text-gray-800">Đăng nhập để giảm giá</p>
+					<button
+						type="button"
+						onClick={onLoginRedirect}
+						className="font-bold text-gray-800 hover:text-orange-600 underline text-left"
+					>
+						Đăng nhập để giảm giá
+					</button>
 					<p className="text-gray-500 text-xs mt-1">
 						Thành viên mới giảm 20% cho đơn đầu tiên.
 					</p>
@@ -810,11 +818,10 @@ const FormField = ({
 						value={field.state.value}
 						onBlur={field.handleBlur}
 						onChange={(e) => field.handleChange(e.target.value)}
-						className={`w-full ${icon ? "pl-9" : "pl-3"} pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${
-							field.state.meta.errors.length
+						className={`w-full ${icon ? "pl-9" : "pl-3"} pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${field.state.meta.errors.length
 								? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
 								: "border-gray-200 bg-gray-50"
-						}`}
+							}`}
 					/>
 				</div>
 				{field.state.meta.errors.length > 0 && (

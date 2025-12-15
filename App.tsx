@@ -262,6 +262,13 @@ const App: React.FC = () => {
 							initialCouponCode={appliedCode}
 							onClearCart={clearCart}
 							onOrderSuccess={handleOrderSuccess}
+							onLoginRedirect={() => {
+								setView(AppView.AUTH);
+								// Cart will close automatically because it's not rendered in AUTH view
+								// But to be clean, we can close it, or let it stay open state so it reopens on return
+								// Based on user flow "return to cart", keeping it open is better.
+								// So we DON'T setIsCartOpen(false) here.
+							}}
 						/>
 
 						<OrderSuccessModal

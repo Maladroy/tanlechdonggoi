@@ -13,7 +13,6 @@
 		"lint:fix": "biome check --fix"
 	},
 	"dependencies": {
-		"@firebase-oss/ui-react": "^7.0.0-beta",
 		"@google/genai": "^1.31.0",
 		"@tailwindcss/vite": "^4.1.17",
 		"@tanstack/react-form": "^1.27.2",
