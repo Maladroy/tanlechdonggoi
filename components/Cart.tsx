@@ -84,7 +84,7 @@ export const Cart: React.FC<Props> = ({
 				total: total,
 				createdAt: new Date().toISOString(),
 				status: "pending",
-				appliedCoupon: appliedCoupon ? appliedCoupon.code : undefined,
+				appliedCoupon: appliedCoupon?.code ?? null,
 				shippingAddress: {
 					street: value.address,
 					city: value.city,
@@ -397,8 +397,8 @@ export const Cart: React.FC<Props> = ({
 																		field.handleChange(e.target.value)
 																	}
 																	className={`w-full pl-3 pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${field.state.meta.errors.length
-																			? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
-																			: "border-gray-200 bg-gray-50"
+																		? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
+																		: "border-gray-200 bg-gray-50"
 																		}`}
 																>
 																	<option value="" disabled>
@@ -480,8 +480,8 @@ export const Cart: React.FC<Props> = ({
 											form="checkout-form" // Links to the form ID above
 											disabled={!canSubmit || isSubmitting}
 											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
-													? "opacity-70 cursor-not-allowed"
-													: ""
+												? "opacity-70 cursor-not-allowed"
+												: ""
 												}`}
 										>
 											{isSubmitting ? (
@@ -819,8 +819,8 @@ const FormField = ({
 						onBlur={field.handleBlur}
 						onChange={(e) => field.handleChange(e.target.value)}
 						className={`w-full ${icon ? "pl-9" : "pl-3"} pr-3 py-2.5 border rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 ${field.state.meta.errors.length
-								? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
-								: "border-gray-200 bg-gray-50"
+							? "border-red-300 bg-red-50 text-red-900 placeholder:text-red-300"
+							: "border-gray-200 bg-gray-50"
 							}`}
 					/>
 				</div>

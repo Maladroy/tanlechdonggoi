@@ -95,7 +95,8 @@ export const createOrder = async (order: Order): Promise<boolean> => {
 		await addDoc(collection(db, "orders"), order);
 
 		// If order has a coupon, mark it as used for the user
-		if (order.appliedCoupon && order.userId) {
+		// Only update if userId is not "guest"
+		if (order.appliedCoupon && order.userId && order.userId !== "guest") {
 			const userRef = doc(db, "users", order.userId);
 			await updateDoc(userRef, {
 				usedCoupons: arrayUnion(order.appliedCoupon),

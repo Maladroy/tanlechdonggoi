@@ -7,6 +7,7 @@ import { AICodeHunter } from "./components/AICodeHunter";
 import { AuthGate } from "./components/AuthGate";
 import { Cart } from "./components/Cart";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
+import { ProductDetailModal } from "./components/ProductDetailModal";
 import { ProfileModal } from "./components/ProfileModal";
 import { PromoPopup } from "./components/PromoPopup";
 import { Shop } from "./components/Shop";
@@ -15,7 +16,6 @@ import {
 	getCategories,
 	getCombos,
 	getCoupons,
-	getUserProfile,
 	signOutUser,
 	subscribeToUserProfile,
 	updateUserProfile,
@@ -43,6 +43,7 @@ const App: React.FC = () => {
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 	const [coupons, setCoupons] = useState<Coupon[]>([]);
 	const [categories, setCategories] = useState<Category[]>([]);
+	const [selectedComboId, setSelectedComboId] = useState<string | null>(null);
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -55,6 +56,13 @@ const App: React.FC = () => {
 			setCoupons(couponData);
 			setCategories(categoryData);
 			setLoading(false);
+
+			// Check URL for product
+			const params = new URLSearchParams(window.location.search);
+			const productId = params.get("product");
+			if (productId) {
+				setSelectedComboId(productId);
+			}
 		};
 		fetchData();
 
@@ -190,6 +198,22 @@ const App: React.FC = () => {
 		setIsCartOpen(true);
 	};
 
+	const handleViewProduct = (combo: Combo) => {
+		setSelectedComboId(combo.id);
+		const url = new URL(window.location.href);
+		url.searchParams.set("product", combo.id);
+		window.history.pushState({}, "", url);
+	};
+
+	const handleCloseProductModal = () => {
+		setSelectedComboId(null);
+		const url = new URL(window.location.href);
+		url.searchParams.delete("product");
+		window.history.pushState({}, "", url);
+	};
+
+	const selectedCombo = combos.find((c) => c.id === selectedComboId) || null;
+
 	const renderView = () => {
 		if (
 			authLoading ||
@@ -238,6 +262,7 @@ const App: React.FC = () => {
 									setView(AppView.AUTH);
 								}
 							}}
+							onViewProduct={handleViewProduct}
 							onAddToCart={addToCart}
 							cartItemCount={cart.length}
 							onOpenCart={() => setIsCartOpen(true)}
@@ -275,6 +300,16 @@ const App: React.FC = () => {
 							isOpen={isSuccessOpen}
 							onClose={() => setIsSuccessOpen(false)}
 							user={user}
+						/>
+
+						<ProductDetailModal
+							isOpen={!!selectedComboId}
+							combo={selectedCombo}
+							onClose={handleCloseProductModal}
+							onAddToCart={(combo) => {
+								addToCart(combo);
+								handleCloseProductModal();
+							}}
 						/>
 
 						{user && (

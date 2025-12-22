@@ -1,4 +1,4 @@
-import { Plus, ShoppingCart, Tag } from "lucide-react";
+import { Flame, Percent, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { Category, Combo, UserProfile } from "../types";
@@ -7,6 +7,7 @@ interface Props {
   combos: Combo[];
   categories: Category[];
   onOpenHunter: () => void;
+  onViewProduct: (combo: Combo) => void;
   onAddToCart: (combo: Combo) => void;
   cartItemCount: number;
   onOpenCart: () => void;
@@ -18,6 +19,7 @@ export const Shop: React.FC<Props> = ({
   combos,
   categories,
   onOpenHunter,
+  onViewProduct,
   onAddToCart,
   cartItemCount,
   onOpenCart,
@@ -161,7 +163,7 @@ export const Shop: React.FC<Props> = ({
                   {Math.round(
                     ((combo.originalPrice - combo.price) /
                       combo.originalPrice) *
-                      100,
+                    100,
                   )}
                   %
                 </div>
@@ -180,13 +182,44 @@ export const Shop: React.FC<Props> = ({
               )}
 
               <div className="relative h-56 overflow-hidden rounded-t-3xl">
-                <img
-                  src={combo.imageUrl}
-                  alt={combo.name}
-                  className="w-full h-full object-cover transform group-hover:scale-105 transition duration-700"
-                />
-                <div className="absolute top-3 left-3 bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
-                  {combo.tags}
+                <button
+                  type="button"
+                  onClick={() => onViewProduct(combo)}
+                  className="w-full h-full block cursor-pointer"
+                >
+                  <img
+                    src={combo.imageUrl}
+                    alt={combo.name}
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition duration-700"
+                  />
+                </button>
+                <div className="absolute top-3 left-3 flex flex-wrap gap-1">
+                  {combo.tags?.map((tag) => {
+                    const lowerTag = tag.toLowerCase();
+                    let className =
+                      "text-xs font-bold px-2 py-1 rounded-md backdrop-blur-md flex items-center gap-1";
+                    let icon = null;
+
+                    if (lowerTag.includes("hot")) {
+                      className += " bg-red-600 text-white shadow-sm";
+                      icon = <Flame size={10} fill="currentColor" />;
+                    } else if (
+                      lowerTag.includes("giảm") ||
+                      lowerTag.includes("sale") ||
+                      lowerTag.includes("%")
+                    ) {
+                      className += " bg-yellow-400 text-yellow-900 shadow-sm";
+                      icon = <Percent size={10} />;
+                    } else {
+                      className += " bg-black/60 text-white";
+                    }
+
+                    return (
+                      <span key={tag} className={className}>
+                        {icon} {tag}
+                      </span>
+                    );
+                  })}
                 </div>
                 {/* Sale Timer */}
                 {/* <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
@@ -196,9 +229,13 @@ export const Shop: React.FC<Props> = ({
 
               <div className="p-5 flex-1 flex flex-col">
                 <div className="mb-2">
-                  <h3 className="font-bold text-xl text-gray-800 leading-snug group-hover:text-orange-600 transition">
+                  <button
+                    type="button"
+                    onClick={() => onViewProduct(combo)}
+                    className="font-bold text-xl text-gray-800 leading-snug group-hover:text-orange-600 transition text-left"
+                  >
                     {combo.name}
-                  </h3>
+                  </button>
                 </div>
 
                 <p className="text-gray-500 text-sm mb-4 line-clamp-2">
