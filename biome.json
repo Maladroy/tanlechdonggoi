@@ -14,7 +14,11 @@
 	},
 	"linter": {
 		"enabled": true,
+
 		"rules": {
+			"a11y": {
+				"useKeyWithClickEvents": "off"
+			},
 			"recommended": true
 		}
 	},
@@ -29,6 +33,11 @@
 			"source": {
 				"organizeImports": "on"
 			}
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }

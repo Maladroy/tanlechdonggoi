@@ -1,7 +1,9 @@
-import { Check, Copy, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
+import { Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import type { Combo } from "../types";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 interface Props {
     combo: Combo | null;
@@ -138,33 +140,35 @@ export const ProductDetailModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="prose prose-sm max-w-none text-gray-600 mb-8 whitespace-pre-line">
-                            {combo.description}
+                        <div className="mb-8">
+                            <MarkdownRenderer content={combo.description} />
                         </div>
 
-                        <div className="bg-orange-50 rounded-xl p-5 mb-8 border border-orange-100">
-                            <h3 className="font-bold text-sm text-orange-900 uppercase tracking-wider mb-3">
-                                Bao gồm trong combo:
-                            </h3>
-                            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {combo.items.map((item, i) => (
-                                    <li
-                                        key={item.charAt(0) + String(i)}
-                                        className="flex items-center gap-3 text-sm text-gray-800 bg-white p-3 rounded-lg border border-orange-100 shadow-sm"
-                                    >
-                                        <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
+                        {combo.items.length > 1 && (
+                            <div className="bg-orange-50 rounded-xl p-5 mb-8 border border-orange-100">
+                                <h3 className="font-bold text-sm text-orange-900 uppercase tracking-wider mb-3">
+                                    Bao gồm trong combo:
+                                </h3>
+                                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {combo.items.map((item, i) => (
+                                        <li
+                                            key={item.charAt(0) + String(i)}
+                                            className="flex items-center gap-3 text-sm text-gray-800 bg-white p-3 rounded-lg border border-orange-100 shadow-sm"
+                                        >
+                                            <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100">
                             <button
                                 type="button"
                                 onClick={() => onAddToCart(combo)}
-                                className="flex-1 bg-gray-900 hover:bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center justify-center gap-2"
+                                className="cursor-pointer flex-1 bg-gray-900 hover:bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center justify-center gap-2"
                             >
                                 Thêm Vào Giỏ <Plus size={20} />
                             </button>

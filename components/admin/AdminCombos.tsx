@@ -7,7 +7,9 @@ import {
 	getCategories,
 	updateCombo,
 } from "../../services/firebase";
+import ReactMarkdown from "react-markdown";
 import type { Category, Combo, ComboStatus } from "../../types";
+import MarkdownRenderer from "../MarkdownRenderer";
 
 interface Props {
 	combos: Combo[];
@@ -149,13 +151,12 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 								</td>
 								<td className="p-4">
 									<span
-										className={`text-xs font-bold px-2 py-1 rounded uppercase ${
-											combo.status === "out_of_stock"
-												? "bg-red-100 text-red-700"
-												: combo.status === "hidden"
-													? "bg-gray-100 text-gray-600"
-													: "bg-green-100 text-green-700"
-										}`}
+										className={`text-xs font-bold px-2 py-1 rounded uppercase ${combo.status === "out_of_stock"
+											? "bg-red-100 text-red-700"
+											: combo.status === "hidden"
+												? "bg-gray-100 text-gray-600"
+												: "bg-green-100 text-green-700"
+											}`}
 									>
 										{combo.status === "out_of_stock"
 											? "Hết hàng"
@@ -196,7 +197,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 			{/* Add/Edit Combo Modal */}
 			{showAddCombo && (
 				<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-					<div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+					<div className="bg-white rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
 						<h3 className="text-xl font-bold mb-6 flex justify-between items-center">
 							{editingComboId ? "Cập Nhật Combo" : "Thêm Combo Mới"}
 							<button
@@ -275,26 +276,43 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 								</div>
 							</div>
 
-							<div>
-								<label
-									htmlFor="combo-desc"
-									className="block text-sm font-bold text-slate-700 mb-1"
-								>
-									Mô tả
-								</label>
-								<textarea
-									id="combo-desc"
-									required
-									rows={3}
-									className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-									value={newCombo.description}
-									onChange={(e) =>
-										setNewCombo({
-											...newCombo,
-											description: e.target.value,
-										})
-									}
-								/>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div>
+									<label
+										htmlFor="combo-desc"
+										className="block text-sm font-bold text-slate-700 mb-1"
+									>
+										Mô tả (Markdown)
+									</label>
+									<textarea
+										id="combo-desc"
+										required
+										rows={6}
+										className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none font-mono text-sm"
+										value={newCombo.description}
+										onChange={(e) =>
+											setNewCombo({
+												...newCombo,
+												description: e.target.value,
+											})
+										}
+										placeholder="Nhập mô tả sản phẩm (hỗ trợ Markdown)..."
+									/>
+								</div>
+								<div>
+									<span className="block text-sm font-bold text-slate-700 mb-1">
+										Xem trước
+									</span>
+									<div className="w-full h-full min-h-[150px] p-3 border border-slate-200 rounded-lg bg-slate-50 overflow-y-auto max-h-40 prose prose-sm prose-slate max-w-none dark:prose-invert">
+										{newCombo.description ? (
+											<MarkdownRenderer content={newCombo.description} />
+										) : (
+											<span className="text-gray-400 italic">
+												Nội dung xem trước sẽ hiện ở đây...
+											</span>
+										)}
+									</div>
+								</div>
 							</div>
 
 							<div>

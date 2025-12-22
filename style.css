@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
 body {
 	font-family: "Be Vietnam Pro", sans-serif;
 }

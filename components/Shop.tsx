@@ -54,7 +54,7 @@ export const Shop: React.FC<Props> = ({
   }, [combos, selectedCategory, sortBy]);
 
   return (
-    <div className="min-h-screen pb-20 md:pb-0 bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Sticky Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-orange-100">
         <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -114,39 +114,46 @@ export const Shop: React.FC<Props> = ({
         🔥 BẠN ĐÃ CÓ MÃ GIẢM GIÁ CHƯA? VÀO LẤY NGAY 🔥
       </button>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Danh Sách Combo 📦
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Chốt đơn nhanh kẻo hết hàng ngon!
-            </p>
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Danh Sách Sản Phẩm 📦
+              </h2>
+              <p className="text-gray-500 text-sm">
+                Chốt đơn nhanh kẻo hết hàng ngon!
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
+              >
+                <option value="default">Mới nhất</option>
+                <option value="price_asc">Giá: Thấp đến Cao</option>
+                <option value="price_desc">Giá: Cao đến Thấp</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
-            >
-              {categoryOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2.5"
-            >
-              <option value="default">Mới nhất</option>
-              <option value="price_asc">Giá: Thấp đến Cao</option>
-              <option value="price_desc">Giá: Cao đến Thấp</option>
-            </select>
+          {/* Category Filter Pills */}
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {categoryOptions.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedCategory(c.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors border ${selectedCategory === c.id
+                  ? "bg-orange-600 text-white border-orange-600 shadow-md"
+                  : "bg-white text-gray-700 hover:bg-gray-100 border-gray-200"
+                  }`}
+              >
+                {c.name}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -242,16 +249,18 @@ export const Shop: React.FC<Props> = ({
                   {combo.description}
                 </p>
 
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {combo.items.map((item, i) => (
-                    <span
-                      key={item.charAt(0) + String(i)}
-                      className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200"
-                    >
-                      + {item}
-                    </span>
-                  ))}
-                </div>
+                {combo.items.length > 1 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {combo.items.map((item, i) => (
+                      <span
+                        key={item.charAt(0) + String(i)}
+                        className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200"
+                      >
+                        + {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
                   <div className="flex flex-col">
@@ -271,7 +280,7 @@ export const Shop: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => onAddToCart(combo)}
-                    className="bg-gray-900 hover:bg-orange-600 text-white pl-5 pr-4 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-2 group/btn"
+                    className="cursor-pointer  bg-gray-900 hover:bg-orange-600 text-white pl-5 pr-4 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-2 group/btn"
                   >
                     Thêm Vào Giỏ
                     <Plus
@@ -287,8 +296,8 @@ export const Shop: React.FC<Props> = ({
       </main>
 
       {/* Footer */}
-      <footer className="mt-12 py-4 text-center text-gray-400 text-sm rel-0 fixed bottom-0 w-full">
-        <p>© 2025 Tân Lếch Đóng Gói. Chỉ bán Combo, không bán lẻ.</p>
+      <footer className="mt-auto py-6 text-center text-gray-400 text-sm w-full border-t border-gray-100 bg-white/50 backdrop-blur-sm">
+        <p>© 2025 Tân Lếch Đóng Gói.</p>
       </footer>
     </div>
   );
