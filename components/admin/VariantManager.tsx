@@ -17,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, ImageIcon, Plus, Trash2 } from "lucide-react";
 import type React from "react";
+import { useEffect, useState } from "react";
 import type { VariantOption, VariantValue } from "../../types";
 import {
 	createEmptyVariantOption,
@@ -52,15 +53,34 @@ const SortableValueItem: React.FC<{
 		opacity: isDragging ? 0.5 : 1,
 	};
 
+	const [priceInput, setPriceInput] = useState(value.priceChange.toString());
+
+	// Sync local state with prop when prop changes
+	useEffect(() => {
+		setPriceInput(value.priceChange.toString());
+	}, [value.priceChange]);
+
+	const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setPriceInput(e.target.value);
+	};
+
+	const handlePriceBlur = () => {
+		let num = Number.parseFloat(priceInput);
+		if (Number.isNaN(num)) {
+			num = 0;
+		}
+		onUpdate(value.id, { priceChange: num });
+		setPriceInput(num.toString());
+	};
+
 	const finalPrice = basePrice + value.priceChange;
 
 	return (
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 ${
-				isDragging ? "shadow-lg" : ""
-			}`}
+			className={`flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 ${isDragging ? "shadow-lg" : ""
+				}`}
 		>
 			<button
 				type="button"
@@ -82,14 +102,13 @@ const SortableValueItem: React.FC<{
 			<div className="relative w-28">
 				<input
 					type="number"
-					value={value.priceChange}
-					onChange={(e) =>
-						onUpdate(value.id, { priceChange: Number(e.target.value) || 0 })
-					}
-					className="w-full px-2 py-1 text-sm border border-slate-200 rounded text-right focus:ring-2 focus:ring-orange-500 focus:outline-none"
+					value={priceInput}
+					onChange={handlePriceChange}
+					onBlur={handlePriceBlur}
+					className="w-full px-2 py-1 text-sm border border-slate-200 rounded text-right focus:ring-2 focus:ring-orange-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 					placeholder="0"
 				/>
-				<span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+				<span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">
 					₫
 				</span>
 			</div>
@@ -121,11 +140,10 @@ const SortableValueItem: React.FC<{
 						onUpdate(value.id, { imageUrl: url || undefined });
 					}
 				}}
-				className={`p-1.5 rounded transition ${
-					value.imageUrl
+				className={`p-1.5 rounded transition ${value.imageUrl
 						? "bg-blue-50 text-blue-600"
 						: "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-				}`}
+					}`}
 				title={value.imageUrl || "Thêm ảnh"}
 			>
 				<ImageIcon size={14} />
@@ -174,124 +192,123 @@ const SortableOptionItem: React.FC<{
 	onRemoveValue,
 	onReorderValues,
 }) => {
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({ id: option.id });
+		const {
+			attributes,
+			listeners,
+			setNodeRef,
+			transform,
+			transition,
+			isDragging,
+		} = useSortable({ id: option.id });
 
-	const sensors = useSensors(
-		useSensor(PointerSensor),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
-	);
+		const sensors = useSensors(
+			useSensor(PointerSensor),
+			useSensor(KeyboardSensor, {
+				coordinateGetter: sortableKeyboardCoordinates,
+			}),
+		);
 
-	const style = {
-		transform: CSS.Transform.toString(transform),
-		transition,
-		opacity: isDragging ? 0.5 : 1,
-	};
+		const style = {
+			transform: CSS.Transform.toString(transform),
+			transition,
+			opacity: isDragging ? 0.5 : 1,
+		};
 
-	const handleValueDragEnd = (event: DragEndEvent) => {
-		const { active, over } = event;
-		if (over && active.id !== over.id) {
-			onReorderValues(option.id, active.id as string, over.id as string);
-		}
-	};
+		const handleValueDragEnd = (event: DragEndEvent) => {
+			const { active, over } = event;
+			if (over && active.id !== over.id) {
+				onReorderValues(option.id, active.id as string, over.id as string);
+			}
+		};
 
-	return (
-		<div
-			ref={setNodeRef}
-			style={style}
-			className={`bg-slate-50 rounded-xl border border-slate-200 overflow-hidden ${
-				isDragging ? "shadow-xl" : ""
-			}`}
-		>
-			{/* Option Header */}
-			<div className="flex items-center gap-2 p-3 bg-white border-b border-slate-100">
-				<button
-					type="button"
-					{...attributes}
-					{...listeners}
-					className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-1"
-				>
-					<GripVertical size={16} />
-				</button>
-
-				<input
-					type="text"
-					value={option.name}
-					onChange={(e) => onUpdate(option.id, { name: e.target.value })}
-					placeholder="Tên biến thể (VD: Size, Màu)"
-					className="flex-1 px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-				/>
-
-				<label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-					<input
-						type="checkbox"
-						checked={option.required}
-						onChange={(e) =>
-							onUpdate(option.id, { required: e.target.checked })
-						}
-						className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500"
-					/>
-					Bắt buộc
-				</label>
-
-				<button
-					type="button"
-					onClick={() => {
-						if (confirm("Xóa biến thể này?")) {
-							onRemove(option.id);
-						}
-					}}
-					className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-					title="Xóa biến thể"
-				>
-					<Trash2 size={16} />
-				</button>
-			</div>
-
-			{/* Values List */}
-			<div className="p-3 space-y-2">
-				<DndContext
-					sensors={sensors}
-					collisionDetection={closestCenter}
-					onDragEnd={handleValueDragEnd}
-				>
-					<SortableContext
-						items={option.values.map((v) => v.id)}
-						strategy={verticalListSortingStrategy}
+		return (
+			<div
+				ref={setNodeRef}
+				style={style}
+				className={`bg-slate-50 rounded-xl border border-slate-200 overflow-hidden ${isDragging ? "shadow-xl" : ""
+					}`}
+			>
+				{/* Option Header */}
+				<div className="flex items-center gap-2 p-3 bg-white border-b border-slate-100">
+					<button
+						type="button"
+						{...attributes}
+						{...listeners}
+						className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-1"
 					>
-						{option.values.map((value) => (
-							<SortableValueItem
-								key={value.id}
-								value={value}
-								basePrice={basePrice}
-								onUpdate={(valueId, updates) =>
-									onUpdateValue(option.id, valueId, updates)
-								}
-								onRemove={(valueId) => onRemoveValue(option.id, valueId)}
-							/>
-						))}
-					</SortableContext>
-				</DndContext>
+						<GripVertical size={16} />
+					</button>
 
-				<button
-					type="button"
-					onClick={() => onAddValue(option.id)}
-					className="w-full py-2 text-sm text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg border border-dashed border-slate-300 hover:border-orange-300 transition flex items-center justify-center gap-1"
-				>
-					<Plus size={14} /> Thêm giá trị
-				</button>
+					<input
+						type="text"
+						value={option.name}
+						onChange={(e) => onUpdate(option.id, { name: e.target.value })}
+						placeholder="Tên biến thể (VD: Size, Màu)"
+						className="flex-1 px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+					/>
+
+					<label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+						<input
+							type="checkbox"
+							checked={option.required}
+							onChange={(e) =>
+								onUpdate(option.id, { required: e.target.checked })
+							}
+							className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500"
+						/>
+						Bắt buộc
+					</label>
+
+					<button
+						type="button"
+						onClick={() => {
+							if (confirm("Xóa biến thể này?")) {
+								onRemove(option.id);
+							}
+						}}
+						className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+						title="Xóa biến thể"
+					>
+						<Trash2 size={16} />
+					</button>
+				</div>
+
+				{/* Values List */}
+				<div className="p-3 space-y-2">
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragEnd={handleValueDragEnd}
+					>
+						<SortableContext
+							items={option.values.map((v) => v.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							{option.values.map((value) => (
+								<SortableValueItem
+									key={value.id}
+									value={value}
+									basePrice={basePrice}
+									onUpdate={(valueId, updates) =>
+										onUpdateValue(option.id, valueId, updates)
+									}
+									onRemove={(valueId) => onRemoveValue(option.id, valueId)}
+								/>
+							))}
+						</SortableContext>
+					</DndContext>
+
+					<button
+						type="button"
+						onClick={() => onAddValue(option.id)}
+						className="w-full py-2 text-sm text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg border border-dashed border-slate-300 hover:border-orange-300 transition flex items-center justify-center gap-1"
+					>
+						<Plus size={14} /> Thêm giá trị
+					</button>
+				</div>
 			</div>
-		</div>
-	);
-};
+		);
+	};
 
 // Main VariantManager Component
 export const VariantManager: React.FC<VariantManagerProps> = ({

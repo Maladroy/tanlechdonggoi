@@ -7,6 +7,12 @@ import {
 	updateOrderStatus,
 } from "../../services/firebase";
 import type { Combo, Coupon, Order, TupleSort } from "../../types";
+import {
+	calculateVariantPrice,
+	ensureNewVariantFormat,
+	getVariantsDisplayText,
+	isVariantCombinationAvailable,
+} from "../../utils";
 
 interface Props {
 	orders: Order[];
@@ -42,37 +48,75 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 		if (combos.length === 0) return []; // Data not loaded yet
 
 		// 1. Validate Products & Prices
-		let calculatedSubtotal = 0;
+		let trueSubtotal = 0;
+
 		for (const item of order.items) {
 			const product = combos.find((c) => c.id === item.id);
+			const itemPrice = item.computedPrice ?? item.price;
+
 			if (!product) {
 				issues.push(`Sản phẩm không tồn tại: "${item.name}" (ID: ${item.id})`);
-				// Skip price check for non-existent item but add to total with order price to assume "trust" for math check?
-				// No, strictly use order price for math if product missing to isolate errors?
-				// Actually if product missing, we can't verify price.
-				calculatedSubtotal += item.price * item.quantity;
+				trueSubtotal += itemPrice * item.quantity;
 				continue;
 			}
-			if (product.price !== item.price) {
-				issues.push(
-					`Giá sản phẩm bị thay đổi: "${item.name}" (Gốc: ${product.price.toLocaleString()}, Đơn: ${item.price.toLocaleString()})`,
+
+			// Calculate expected price considering variants
+			let expectedPrice = product.price;
+
+			if (item.selectedVariants) {
+				const normalizedVariants = ensureNewVariantFormat(
+					product.variants,
+					product.variantImages,
+				);
+
+				// Validate Variant Existence
+				for (const [optionId, valueId] of Object.entries(
+					item.selectedVariants,
+				)) {
+					const option = normalizedVariants.find((v) => v.id === optionId);
+					if (!option) {
+						issues.push(
+							`Biến thể không tồn tại: "${item.name}" (Option: ${optionId})`,
+						);
+						continue;
+					}
+					const value = option.values.find((v) => v.id === valueId);
+					if (!value) {
+						issues.push(
+							`Giá trị biến thể sai: "${item.name}" (${option.name}: ${valueId})`,
+						);
+					}
+				}
+
+				// Validate Combination
+				const availability = isVariantCombinationAvailable(
+					item.selectedVariants,
+					product.variantCombinationRules,
+				);
+				if (!availability.available) {
+					issues.push(
+						`Tổ hợp biến thể bị cấm/hết hàng: "${item.name}" (${availability.reason || "Không khả dụng"
+						})`,
+					);
+				}
+
+				// Calculate Price
+				expectedPrice = calculateVariantPrice(
+					product.price,
+					item.selectedVariants,
+					normalizedVariants,
+					product.variantCombinationRules,
 				);
 			}
-			calculatedSubtotal += item.price * item.quantity; // Use item price to verify math consistency, or product price?
-			// Use PRODUCT price to verify if total was manipulated based on real prices.
-			// Re-calculating using REAL prices:
-			// actually let's use the product price for the "True Total" calculation.
-		}
 
-		// Recalculate TRUE total based on DB prices
-		let trueSubtotal = 0;
-		for (const item of order.items) {
-			const product = combos.find((c) => c.id === item.id);
-			if (product) {
-				trueSubtotal += product.price * item.quantity;
-			} else {
-				trueSubtotal += item.price * item.quantity; // Fallback
+			if (expectedPrice !== itemPrice) {
+				issues.push(
+					`Giá sản phẩm không khớp: "${item.name
+					}" (Hệ thống tính: ${expectedPrice.toLocaleString()}, Đơn: ${itemPrice.toLocaleString()})`,
+				);
 			}
+
+			trueSubtotal += expectedPrice * item.quantity;
 		}
 
 		// 2. Validate Coupon
@@ -128,9 +172,6 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 					discount = Math.min(discount, trueSubtotal);
 				}
 			}
-		} else {
-			// If no coupon, but total < subtotal?
-			// Maybe manual discount? We assume strict logic.
 		}
 
 		const trueTotal = trueSubtotal - discount;
@@ -336,11 +377,29 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 										</td>
 										<td className="p-4 max-w-xs">
 											<div className="text-xs space-y-1">
-												{order.items.slice(0, 2).map((item) => (
-													<div key={item.id}>
-														{item.quantity}x {item.name}
-													</div>
-												))}
+												{order.items.slice(0, 2).map((item) => {
+													const product = combos.find((c) => c.id === item.id);
+													let variantText = "";
+													if (product && item.selectedVariants) {
+														variantText = getVariantsDisplayText(
+															item.selectedVariants,
+															ensureNewVariantFormat(
+																product.variants,
+																product.variantImages,
+															),
+														);
+													}
+													return (
+														<div key={item.id}>
+															{item.quantity}x {item.name}
+															{variantText && (
+																<div className="text-[10px] text-slate-400 italic">
+																	{variantText}
+																</div>
+															)}
+														</div>
+													);
+												})}
 												{order.items.length > 2 && (
 													<div className="text-slate-400">
 														...và {order.items.length - 2} món khác
@@ -580,27 +639,46 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 											</tr>
 										</thead>
 										<tbody className="divide-y divide-gray-100">
-											{selectedOrder.items.map((item) => (
-												<tr key={item.id}>
-													<td className="p-3">
-														<div className="font-medium text-gray-900">
-															{item.name}
-														</div>
-														<div className="text-xs text-gray-500">
-															{item.items.join(", ")}
-														</div>
-													</td>
-													<td className="p-3 text-center font-medium">
-														x{item.quantity}
-													</td>
-													<td className="p-3 text-right text-gray-600">
-														{item.price.toLocaleString()}đ
-													</td>
-													<td className="p-3 text-right font-bold text-gray-900">
-														{(item.price * item.quantity).toLocaleString()}đ
-													</td>
-												</tr>
-											))}
+											{selectedOrder.items.map((item) => {
+												const product = combos.find((c) => c.id === item.id);
+												let variantText = "";
+												if (product && item.selectedVariants) {
+													variantText = getVariantsDisplayText(
+														item.selectedVariants,
+														ensureNewVariantFormat(
+															product.variants,
+															product.variantImages,
+														),
+													);
+												}
+
+												return (
+													<tr key={item.id}>
+														<td className="p-3">
+															<div className="font-medium text-gray-900">
+																{item.name}
+															</div>
+															<div className="text-xs text-gray-500">
+																{item.items.join(", ")}
+															</div>
+															{variantText && (
+																<div className="text-xs text-orange-600 font-medium mt-1 bg-orange-50 px-2 py-1 rounded inline-block">
+																	{variantText}
+																</div>
+															)}
+														</td>
+														<td className="p-3 text-center font-medium">
+															x{item.quantity}
+														</td>
+														<td className="p-3 text-right text-gray-600">
+															{item.price.toLocaleString()}đ
+														</td>
+														<td className="p-3 text-right font-bold text-gray-900">
+															{(item.price * item.quantity).toLocaleString()}đ
+														</td>
+													</tr>
+												);
+											})}
 										</tbody>
 										<tfoot className="bg-gray-50">
 											{selectedOrder.appliedCoupon && (

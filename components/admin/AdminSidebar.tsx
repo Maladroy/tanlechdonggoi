@@ -39,66 +39,60 @@ export const AdminSidebar: React.FC<Props> = ({
 				<button
 					type="button"
 					onClick={() => setActiveTab("orders")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "orders"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "orders"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
 					<ShoppingCart size={20} /> Đơn Hàng
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("combos")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "combos"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "combos"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
-					<Package size={20} /> Quản Lý Combo
+					<Package size={20} /> Quản Lý Sản Phẩm
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("categories")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "categories"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "categories"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
 					<Layers size={20} /> Danh Mục
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("coupons")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "coupons"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "coupons"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
 					<Tag size={20} /> Mã Giảm Giá
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("users")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "users"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "users"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
 					<Users size={20} /> Khách Hàng
 				</button>
 				<button
 					type="button"
 					onClick={() => setActiveTab("settings")}
-					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-						activeTab === "settings"
+					className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${activeTab === "settings"
 							? "bg-orange-600 text-white"
 							: "text-slate-400 hover:bg-slate-800"
-					}`}
+						}`}
 				>
 					<Settings size={20} /> Cài Đặt
 				</button>
