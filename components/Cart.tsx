@@ -59,6 +59,8 @@ export const Cart: React.FC<Props> = ({
 	const [couponInput, setCouponInput] = useState("");
 	const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 	const [hasAutoApplied, setHasAutoApplied] = useState(false);
+	const [isCoolingDown, setIsCoolingDown] = useState(false);
+	const COOLDOWN_TIME = 60000; // 60 seconds
 
 	// Form logic
 	const form = useForm({
@@ -70,6 +72,14 @@ export const Cart: React.FC<Props> = ({
 			zipCode: "",
 		},
 		onSubmit: async ({ value }) => {
+			// Check cooldown
+			const lastOrder = localStorage.getItem("lastOrderTime");
+			if (lastOrder && Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME) {
+				// eslint-disable-next-line no-alert
+				alert("Vui lòng đợi 1 phút trước khi đặt đơn tiếp theo!");
+				return;
+			}
+
 			const { total } = calculateTotal();
 			let orderUser = user;
 			let userId = auth.currentUser?.uid;
@@ -97,6 +107,10 @@ export const Cart: React.FC<Props> = ({
 			});
 
 			if (success) {
+				localStorage.setItem("lastOrderTime", Date.now().toString());
+				setIsCoolingDown(true);
+				setTimeout(() => setIsCoolingDown(false), COOLDOWN_TIME);
+
 				onClearCart();
 				onOrderSuccess();
 				setStep("cart"); // Reset step
@@ -142,7 +156,7 @@ export const Cart: React.FC<Props> = ({
 
 	// Coupon Logic
 	const handleApplyCoupon = useCallback(
-		async (codeOverride?: string) => {
+		async (codeOverride?: string, silent = false) => {
 			const code = codeOverride || couponInput;
 			if (!code) return;
 			setIsValidatingCoupon(true);
@@ -181,7 +195,9 @@ export const Cart: React.FC<Props> = ({
 				if (!codeOverride) setCouponInput("");
 			} catch (e: unknown) {
 				const error = e as Error;
-				setCouponError(error.message || "Lỗi kiểm tra mã");
+				if (!silent) {
+					setCouponError(error.message || "Lỗi kiểm tra mã");
+				}
 				setAppliedCoupon(null);
 			} finally {
 				setIsValidatingCoupon(false);
@@ -192,7 +208,21 @@ export const Cart: React.FC<Props> = ({
 
 	// Effects
 	useEffect(() => {
-		if (!isOpen) setHasAutoApplied(false);
+		if (!isOpen) {
+			setHasAutoApplied(false);
+		} else {
+			// Check cooldown when opening
+			const lastOrder = localStorage.getItem("lastOrderTime");
+			if (
+				lastOrder &&
+				Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME
+			) {
+				setIsCoolingDown(true);
+				const remaining =
+					COOLDOWN_TIME - (Date.now() - Number.parseInt(lastOrder));
+				setTimeout(() => setIsCoolingDown(false), remaining);
+			}
+		}
 	}, [isOpen]);
 
 	useEffect(() => {
@@ -209,7 +239,7 @@ export const Cart: React.FC<Props> = ({
 				return;
 			for (const code of user.ownedCoupons) {
 				if (user.usedCoupons?.includes(code)) continue;
-				await handleApplyCoupon(code);
+				await handleApplyCoupon(code, true);
 				if (appliedCoupon) break;
 			}
 			setHasAutoApplied(true);
@@ -496,14 +526,16 @@ export const Cart: React.FC<Props> = ({
 										<button
 											type="submit"
 											form="checkout-form" // Links to the form ID above
-											disabled={!canSubmit || isSubmitting}
-											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
+											disabled={!canSubmit || isSubmitting || isCoolingDown}
+											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting || isCoolingDown
 												? "opacity-70 cursor-not-allowed"
 												: ""
 												}`}
 										>
 											{isSubmitting ? (
 												<Loader2 size={20} className="animate-spin" />
+											) : isCoolingDown ? (
+												"Vui lòng đợi..."
 											) : (
 												"Xác nhận đặt hàng"
 											)}

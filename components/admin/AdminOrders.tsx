@@ -1,8 +1,12 @@
-import { Eye, Filter, Package, Search, X } from "lucide-react";
+import { AlertTriangle, Eye, Filter, Package, Search, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { updateOrderStatus } from "../../services/firebase";
-import type { Order, TupleSort } from "../../types";
+import {
+	getCombos,
+	getCoupons,
+	updateOrderStatus,
+} from "../../services/firebase";
+import type { Combo, Coupon, Order, TupleSort } from "../../types";
 
 interface Props {
 	orders: Order[];
@@ -20,6 +24,127 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 	}>({ key: "createdAt", direction: "desc" });
 	const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 	const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+	const [combos, setCombos] = useState<Combo[]>([]);
+	const [coupons, setCoupons] = useState<Coupon[]>([]);
+
+	// Load reference data for validation
+	useEffect(() => {
+		const loadData = async () => {
+			const [cbs, cps] = await Promise.all([getCombos(), getCoupons()]);
+			setCombos(cbs);
+			setCoupons(cps);
+		};
+		loadData();
+	}, []);
+
+	const validateOrder = (order: Order): string[] => {
+		const issues: string[] = [];
+		if (combos.length === 0) return []; // Data not loaded yet
+
+		// 1. Validate Products & Prices
+		let calculatedSubtotal = 0;
+		for (const item of order.items) {
+			const product = combos.find((c) => c.id === item.id);
+			if (!product) {
+				issues.push(`Sản phẩm không tồn tại: "${item.name}" (ID: ${item.id})`);
+				// Skip price check for non-existent item but add to total with order price to assume "trust" for math check?
+				// No, strictly use order price for math if product missing to isolate errors?
+				// Actually if product missing, we can't verify price.
+				calculatedSubtotal += item.price * item.quantity;
+				continue;
+			}
+			if (product.price !== item.price) {
+				issues.push(
+					`Giá sản phẩm bị thay đổi: "${item.name}" (Gốc: ${product.price.toLocaleString()}, Đơn: ${item.price.toLocaleString()})`,
+				);
+			}
+			calculatedSubtotal += item.price * item.quantity; // Use item price to verify math consistency, or product price?
+			// Use PRODUCT price to verify if total was manipulated based on real prices.
+			// Re-calculating using REAL prices:
+			// actually let's use the product price for the "True Total" calculation.
+		}
+
+		// Recalculate TRUE total based on DB prices
+		let trueSubtotal = 0;
+		for (const item of order.items) {
+			const product = combos.find((c) => c.id === item.id);
+			if (product) {
+				trueSubtotal += product.price * item.quantity;
+			} else {
+				trueSubtotal += item.price * item.quantity; // Fallback
+			}
+		}
+
+		// 2. Validate Coupon
+		let discount = 0;
+		if (order.appliedCoupon) {
+			const coupon = coupons.find(
+				(c) => c.code.toUpperCase() === order.appliedCoupon?.toUpperCase(),
+			);
+			if (!coupon) {
+				issues.push(`Mã giảm giá không tồn tại: ${order.appliedCoupon}`);
+			} else {
+				// Expiry Check
+				if (new Date(coupon.expiryDate) < new Date(order.createdAt)) {
+					issues.push(
+						`Mã giảm giá đã hết hạn vào lúc đặt đơn: ${order.appliedCoupon}`,
+					);
+				}
+
+				// Reuse Check
+				const userOrders = orders.filter(
+					(o) =>
+						o.userId === order.userId &&
+						o.id !== order.id &&
+						o.status !== "cancelled" &&
+						o.appliedCoupon === order.appliedCoupon,
+				);
+				if (userOrders.length > 0) {
+					issues.push(
+						`Mã giảm giá bị dùng lại (Đơn khác: ${userOrders
+							.map((o) => o.id?.slice(0, 5))
+							.join(", ")})`,
+					);
+				}
+
+				// Calculate Discount
+				let applicable = true;
+				if (
+					coupon.applicableCombos?.length &&
+					!order.items.some((item) =>
+						coupon.applicableCombos?.includes(item.id),
+					)
+				) {
+					applicable = false;
+					issues.push(`Mã không áp dụng cho sản phẩm trong đơn`);
+				}
+
+				if (applicable) {
+					if (coupon.type === "percent" && coupon.value) {
+						discount = (trueSubtotal * coupon.value) / 100;
+					} else if (coupon.type === "fixed" && coupon.value) {
+						discount = coupon.value;
+					}
+					discount = Math.min(discount, trueSubtotal);
+				}
+			}
+		} else {
+			// If no coupon, but total < subtotal?
+			// Maybe manual discount? We assume strict logic.
+		}
+
+		const trueTotal = trueSubtotal - discount;
+
+		// 3. Compare Totals
+		// Use a tolerance for floating point or minor diffs
+		if (Math.abs(trueTotal - order.total) > 1000) {
+			issues.push(
+				`Tổng tiền không khớp (Hệ thống tính: ${trueTotal.toLocaleString()}, Đơn: ${order.total.toLocaleString()})`,
+			);
+		}
+
+		return issues;
+	};
 
 	// Filter & Sort Orders
 	useEffect(() => {
@@ -193,6 +318,15 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 									<tr key={order.id} className="hover:bg-slate-50">
 										<td className="p-4 font-mono text-xs">
 											{order.id?.slice(0, 8)}...
+											{validateOrder(order).length > 0 && (
+												<div
+													className="text-red-500 flex items-center gap-1 mt-1 font-bold"
+													title="Đơn hàng có dấu hiệu bất thường!"
+												>
+													<AlertTriangle size={12} />
+													WARNING
+												</div>
+											)}
 										</td>
 										<td className="p-4">
 											<div className="font-bold text-slate-800">
@@ -231,13 +365,12 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 										</td>
 										<td className="p-4">
 											<span
-												className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-													order.status === "confirmed"
-														? "bg-green-100 text-green-700"
-														: order.status === "cancelled"
-															? "bg-red-100 text-red-700"
-															: "bg-yellow-100 text-yellow-700"
-												}`}
+												className={`px-2 py-1 rounded text-xs font-bold uppercase ${order.status === "confirmed"
+													? "bg-green-100 text-green-700"
+													: order.status === "cancelled"
+														? "bg-red-100 text-red-700"
+														: "bg-yellow-100 text-yellow-700"
+													}`}
 											>
 												{order.status === "confirmed"
 													? "Đã Chốt"
@@ -258,21 +391,20 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 												</button>
 
 												<select
-													className={`text-xs border rounded p-1 outline-none font-bold ${
-														order.status === "confirmed"
-															? "text-green-600 border-green-200 bg-green-50"
-															: order.status === "cancelled"
-																? "text-red-600 border-red-200 bg-red-50"
-																: "text-yellow-600 border-yellow-200 bg-yellow-50"
-													}`}
+													className={`text-xs border rounded p-1 outline-none font-bold ${order.status === "confirmed"
+														? "text-green-600 border-green-200 bg-green-50"
+														: order.status === "cancelled"
+															? "text-red-600 border-red-200 bg-red-50"
+															: "text-yellow-600 border-yellow-200 bg-yellow-50"
+														}`}
 													value={order.status}
 													onChange={(e) =>
 														handleStatusUpdate(
 															order.id!,
 															e.target.value as
-																| "pending"
-																| "confirmed"
-																| "cancelled",
+															| "pending"
+															| "confirmed"
+															| "cancelled",
 														)
 													}
 													onClick={(e) => e.stopPropagation()}
@@ -296,9 +428,16 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 				<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
 					<div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
 						<div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-							<h3 className="text-xl font-bold text-gray-800">
-								Chi Tiết Đơn Hàng #{selectedOrder.id?.slice(0, 8)}
-							</h3>
+							<div className="flex flex-col">
+								<h3 className="text-xl font-bold text-gray-800">
+									Chi Tiết Đơn Hàng #{selectedOrder.id?.slice(0, 8)}
+								</h3>
+								{validateOrder(selectedOrder).length > 0 && (
+									<span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200 w-fit mt-1">
+										⚠ ĐƠN HÀNG ĐÃ BỊ CAN THIỆP
+									</span>
+								)}
+							</div>
 							<button
 								type="button"
 								onClick={() => setSelectedOrder(null)}
@@ -309,6 +448,22 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 						</div>
 
 						<div className="p-6 overflow-y-auto flex-1 space-y-8">
+							{/* Security Validation Alerts */}
+							{validateOrder(selectedOrder).length > 0 && (
+								<div className="bg-red-50 border border-red-200 rounded-xl p-4 animate-pulse">
+									<h4 className="flex items-center gap-2 font-bold text-red-800 mb-2">
+										<AlertTriangle size={20} />
+										Cảnh báo an toàn
+									</h4>
+									<ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+										{validateOrder(selectedOrder).map((issue, idx) => (
+											// biome-ignore lint/suspicious/noArrayIndexKey: List is static
+											<li key={idx}>{issue}</li>
+										))}
+									</ul>
+								</div>
+							)}
+
 							{/* Status & Meta */}
 							<div className="flex flex-wrap gap-4 justify-between items-center">
 								<div className="flex items-center gap-2 text-sm text-gray-500">
@@ -319,13 +474,12 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 									</span>
 								</div>
 								<span
-									className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${
-										selectedOrder.status === "confirmed"
-											? "bg-green-100 text-green-700"
-											: selectedOrder.status === "cancelled"
-												? "bg-red-100 text-red-700"
-												: "bg-yellow-100 text-yellow-700"
-									}`}
+									className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${selectedOrder.status === "confirmed"
+										? "bg-green-100 text-green-700"
+										: selectedOrder.status === "cancelled"
+											? "bg-red-100 text-red-700"
+											: "bg-yellow-100 text-yellow-700"
+										}`}
 								>
 									{selectedOrder.status === "confirmed"
 										? "Đã Chốt Đơn"
@@ -493,13 +647,12 @@ export const AdminOrders: React.FC<Props> = ({ orders, onRefresh }) => {
 									Cập nhật trạng thái:
 								</span>
 								<select
-									className={`text-sm border rounded-lg px-3 py-2 outline-none font-bold cursor-pointer ${
-										selectedOrder.status === "confirmed"
-											? "text-green-600 border-green-200 bg-green-50"
-											: selectedOrder.status === "cancelled"
-												? "text-red-600 border-red-200 bg-red-50"
-												: "text-yellow-600 border-yellow-200 bg-yellow-50"
-									}`}
+									className={`text-sm border rounded-lg px-3 py-2 outline-none font-bold cursor-pointer ${selectedOrder.status === "confirmed"
+										? "text-green-600 border-green-200 bg-green-50"
+										: selectedOrder.status === "cancelled"
+											? "text-red-600 border-red-200 bg-red-50"
+											: "text-yellow-600 border-yellow-200 bg-yellow-50"
+										}`}
 									value={selectedOrder.status}
 									onChange={(e) =>
 										handleStatusUpdate(
