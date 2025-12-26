@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import type { Combo } from "../types";
 import MarkdownRenderer from "./MarkdownRenderer";
+import { Toast } from "./Toast";
 
 interface Props {
     combo: Combo | null;
@@ -49,6 +50,7 @@ export const ProductDetailModal: React.FC<Props> = ({
     onAddToCart,
 }) => {
     const [copied, setCopied] = useState(false);
+    const [showToast, setShowToast] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false);
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
     const [currentImage, setCurrentImage] = useState<string>("");
@@ -80,6 +82,7 @@ export const ProductDetailModal: React.FC<Props> = ({
         const url = `${window.location.origin}${window.location.pathname}?product=${combo.id}`;
         navigator.clipboard.writeText(url);
         setCopied(true);
+        setShowToast(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
@@ -126,6 +129,11 @@ export const ProductDetailModal: React.FC<Props> = ({
                 </div>
             )}
 
+            <Toast
+                message="Đã sao chép liên kết!"
+                isVisible={showToast}
+                onClose={() => setShowToast(false)}
+            />
             <div
                 className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]"
                 onClick={(e) => e.stopPropagation()}
@@ -163,7 +171,7 @@ export const ProductDetailModal: React.FC<Props> = ({
 
                     {/* Content Section */}
                     <div className="p-6 md:p-8">
-                        <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex items-start justify-between gap-4 mb-8">
                             <h2 className="text-2xl font-bold text-gray-900 leading-tight">
                                 {combo.name}
                             </h2>
@@ -182,9 +190,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="mb-8">
-                            <MarkdownRenderer content={combo.description} />
-                        </div>
+                        <MarkdownRenderer content={combo.description} />
 
                         {/* Variant Selection */}
                         {combo.type === "product" && combo.variants && combo.variants.length > 0 && (

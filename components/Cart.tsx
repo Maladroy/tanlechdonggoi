@@ -74,7 +74,7 @@ export const Cart: React.FC<Props> = ({
 		onSubmit: async ({ value }) => {
 			// Check cooldown
 			const lastOrder = localStorage.getItem("lastOrderTime");
-			if (lastOrder && Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME) {
+			if (lastOrder && Date.now() - Number.parseInt(lastOrder, 10) < COOLDOWN_TIME) {
 				// eslint-disable-next-line no-alert
 				alert("Vui lòng đợi 1 phút trước khi đặt đơn tiếp theo!");
 				return;
