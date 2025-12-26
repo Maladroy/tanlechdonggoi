@@ -12,6 +12,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isRemovingItemsFromArray(field) {
+      return resource.data[field].size() > request.resource.data[field].size() && 
+             resource.data[field].hasAll(request.resource.data[field]);
+    }
+
+
     // Combos: Everyone can read, only Admin can write
     match /combos/{comboId} {
       allow read: if true;
@@ -63,6 +69,11 @@ service cloud.firestore {
       // Update: User can update own profile (including usedCoupons, ownedCoupons), but cannot change isAdmin
       allow update: if isAuth() && request.auth.uid == userId && 
         (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == resource.data.isAdmin);
+
+      // User cannot remove their usedCoupons array but can add to it
+      allow update: if isAuth() && request.auth.uid == userId &&
+        (resource.data.usedCoupons == request.resource.data.usedCoupons ||
+         !isRemovingItemsFromArray('usedCoupons'));
         
       // Admin can write anything
       allow write: if isAdmin();

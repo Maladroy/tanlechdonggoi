@@ -482,7 +482,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 							{newCombo.type === "product" && (
 								<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
 									<label htmlFor="variant-list" className="block text-sm font-bold text-slate-700 mb-3">
-										Biến thể sản phẩm (Variants)
+										Biến thể sản phẩm
 									</label>
 									<div className="space-y-3 mb-4" id="variants-list">
 										{tempVariants.map((v, idx) => (
@@ -537,7 +537,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 
 									{tempVariants.length > 0 && (
 										<div className="mt-4 border-t border-slate-200 pt-4">
-											<h4 className="text-sm font-bold text-slate-700 mb-2">Ảnh biến thể (Tùy chọn)</h4>
+											<h4 className="text-sm font-bold text-slate-700 mb-2">Ảnh (Tuỳ chọn)</h4>
 											<div className="space-y-2">
 												{Array.from(new Set(tempVariants.flatMap(v => v.values))).map(val => (
 													<div key={val} className="flex items-center gap-2">

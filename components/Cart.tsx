@@ -600,76 +600,87 @@ const CartItemRow = ({
 		selectedVariants?: Record<string, string>,
 	) => void;
 	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
-}) => (
-	<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
-		<div className="relative w-20 h-20 shrink-0">
-			<img
-				src={item.imageUrl}
-				alt={item.name}
-				className="w-full h-full object-cover rounded-lg bg-gray-50"
-			/>
-			{appliedCoupon?.applicableCombos?.includes(item.id) && (
-				<div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-sm cursor-pointer">
-					<Ticket size={10} />
-				</div>
-			)}
-		</div>
-		<div className="flex-1 flex flex-col justify-between min-w-0">
-			<div>
-				<h3 className="font-bold text-gray-800 text-sm truncate">
-					{item.name}
-				</h3>
-				{item.selectedVariants &&
-					Object.keys(item.selectedVariants).length > 0 && (
-						<div className="flex flex-wrap gap-1 mt-1">
-							{Object.entries(item.selectedVariants).map(([key, value]) => (
-								<span
-									key={key}
-									className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200"
-								>
-									{value}
-								</span>
-							))}
-						</div>
-					)}
-				<p className="text-orange-600 font-bold text-sm mt-0.5">
-					{item.price.toLocaleString("vi-VN")}₫
-				</p>
+}) => {
+	const displayImage = (() => {
+		if (item.variantImages && item.selectedVariants) {
+			for (const value of Object.values(item.selectedVariants)) {
+				if (item.variantImages[value]) return item.variantImages[value];
+			}
+		}
+		return item.imageUrl;
+	})();
+
+	return (
+		<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
+			<div className="relative w-20 h-20 shrink-0">
+				<img
+					src={displayImage}
+					alt={item.name}
+					className="w-full h-full object-cover rounded-lg bg-gray-50"
+				/>
+				{appliedCoupon?.applicableCombos?.includes(item.id) && (
+					<div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-sm cursor-pointer">
+						<Ticket size={10} />
+					</div>
+				)}
 			</div>
-			<div className="flex justify-between items-center gap-2">
-				<div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-200">
+			<div className="flex-1 flex flex-col justify-between min-w-0">
+				<div>
+					<h3 className="font-bold text-gray-800 text-sm truncate">
+						{item.name}
+					</h3>
+					{item.selectedVariants &&
+						Object.keys(item.selectedVariants).length > 0 && (
+							<div className="flex flex-wrap gap-1 mt-1">
+								{Object.entries(item.selectedVariants).map(([key, value]) => (
+									<span
+										key={key}
+										className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200"
+									>
+										{value}
+									</span>
+								))}
+							</div>
+						)}
+					<p className="text-orange-600 font-bold text-sm mt-0.5">
+						{item.price.toLocaleString("vi-VN")}₫
+					</p>
+				</div>
+				<div className="flex justify-between items-center gap-2">
+					<div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-200">
+						<button
+							type="button"
+							onClick={() =>
+								onUpdateQuantity(item.id, -1, item.selectedVariants)
+							}
+							disabled={item.quantity <= 1}
+							className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all cursor-pointer"
+						>
+							<Minus size={12} />
+						</button>
+						<span className="text-sm font-bold text-gray-800 w-6 text-center">
+							{item.quantity}
+						</span>
+						<button
+							type="button"
+							onClick={() => onUpdateQuantity(item.id, 1, item.selectedVariants)}
+							className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all cursor-pointer"
+						>
+							<Plus size={12} />
+						</button>
+					</div>
 					<button
 						type="button"
-						onClick={() =>
-							onUpdateQuantity(item.id, -1, item.selectedVariants)
-						}
-						disabled={item.quantity <= 1}
-						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all cursor-pointer"
+						onClick={() => onRemove(item.id, item.selectedVariants)}
+						className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
 					>
-						<Minus size={12} />
-					</button>
-					<span className="text-sm font-bold text-gray-800 w-6 text-center">
-						{item.quantity}
-					</span>
-					<button
-						type="button"
-						onClick={() => onUpdateQuantity(item.id, 1, item.selectedVariants)}
-						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all cursor-pointer"
-					>
-						<Plus size={12} />
+						<Trash2 size={16} />
 					</button>
 				</div>
-				<button
-					type="button"
-					onClick={() => onRemove(item.id, item.selectedVariants)}
-					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
-				>
-					<Trash2 size={16} />
-				</button>
 			</div>
 		</div>
-	</div>
-);
+	);
+};
 
 const CouponSection = ({
 	user,
