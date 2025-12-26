@@ -284,9 +284,7 @@ export const Shop: React.FC<Props> = ({
                     }}
                     className="cursor-pointer  bg-gray-900 hover:bg-orange-600 text-white pl-5 pr-4 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-2 group/btn"
                   >
-                    {combo.type === "product" && combo.variants?.length
-                      ? "Chọn Phân Loại"
-                      : "Thêm Vào Giỏ"}
+                    Thêm Vào Giỏ
                     <Plus
                       size={18}
                       className="group-hover/btn:rotate-90 transition"
