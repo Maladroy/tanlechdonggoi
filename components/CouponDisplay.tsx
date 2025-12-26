@@ -18,7 +18,7 @@ interface Props {
 	onApply: (code: string) => void;
 }
 
-export const AICodeHunter: React.FC<Props> = ({
+export const CouponDisplay: React.FC<Props> = ({
 	onBack,
 	onGoToShop,
 	onApply,

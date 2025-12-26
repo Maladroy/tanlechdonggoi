@@ -8,7 +8,7 @@ import {
 	updateCombo,
 } from "../../services/firebase";
 import ReactMarkdown from "react-markdown";
-import type { Category, Combo, ComboStatus } from "../../types";
+import type { Category, Combo, ComboStatus, VariantOption } from "../../types";
 import MarkdownRenderer from "../MarkdownRenderer";
 
 interface Props {
@@ -30,9 +30,16 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 		tags: [],
 		items: [],
 		category: "",
+		type: "combo",
+		variants: [],
+		variantImages: {},
 	});
 	const [itemsInput, setItemsInput] = useState("");
 	const [tagsInput, setTagsInput] = useState("");
+	// State for managing variants in the modal
+	const [tempVariants, setTempVariants] = useState<VariantOption[]>([]);
+	const [newVariantName, setNewVariantName] = useState("");
+	const [newVariantValues, setNewVariantValues] = useState("");
 
 	useEffect(() => {
 		getCategories().then(setCategories);
@@ -46,11 +53,24 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 			.map((t) => t.trim())
 			.filter(Boolean);
 
+		// If it's a product, we use the product name as the single "item" (legacy compat)
+		// or we can leave items empty if the system handles it.
+		// For safety/backward compat with cart logic that might show items,
+		// let's ensure items has at least the product name if type is 'product'.
+		const finalItems =
+			newCombo.type === "product"
+				? items.length > 0
+					? items
+					: [newCombo.name || "Sản phẩm"]
+				: items;
+
 		const comboData = {
 			...(newCombo as Omit<Combo, "id">),
-			items,
+			items: finalItems,
 			tags: tags.length ? tags : ["Mới"],
 			status: newCombo.status || "available",
+			variants: newCombo.type === "product" ? tempVariants : [],
+			type: newCombo.type || "combo",
 		};
 
 		if (editingComboId) {
@@ -64,9 +84,10 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 	};
 
 	const openEditCombo = (combo: Combo) => {
-		setNewCombo(combo);
+		setNewCombo({ ...combo, type: combo.type || "combo" });
 		setItemsInput(combo.items.join(", "));
 		setTagsInput(combo.tags.join(", "));
+		setTempVariants(combo.variants || []);
 		setEditingComboId(combo.id);
 		setShowAddCombo(true);
 	};
@@ -84,9 +105,30 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 			items: [],
 			status: "available",
 			category: "",
+			type: "combo",
+			variants: [],
+			variantImages: {},
 		});
 		setItemsInput("");
 		setTagsInput("");
+		setTempVariants([]);
+		setNewVariantName("");
+		setNewVariantValues("");
+	};
+
+	const addVariant = () => {
+		if (!newVariantName || !newVariantValues) return;
+		const values = newVariantValues.split(",").map((v) => v.trim());
+		setTempVariants([
+			...tempVariants,
+			{ name: newVariantName, values: values },
+		]);
+		setNewVariantName("");
+		setNewVariantValues("");
+	};
+
+	const removeVariant = (index: number) => {
+		setTempVariants(tempVariants.filter((_, i) => i !== index));
 	};
 
 	const handleDeleteCombo = async (id: string) => {
@@ -209,22 +251,46 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 							</button>
 						</h3>
 						<form onSubmit={handleSaveCombo} className="space-y-4">
-							<div>
-								<label
-									htmlFor="combo-name"
-									className="block text-sm font-bold text-slate-700 mb-1"
-								>
-									Tên Combo
-								</label>
-								<input
-									id="combo-name"
-									required
-									className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-									value={newCombo.name}
-									onChange={(e) =>
-										setNewCombo({ ...newCombo, name: e.target.value })
-									}
-								/>
+							<div className="flex gap-4">
+								<div className="flex-1">
+									<label
+										htmlFor="combo-name"
+										className="block text-sm font-bold text-slate-700 mb-1"
+									>
+										Tên Sản Phẩm
+									</label>
+									<input
+										id="combo-name"
+										required
+										className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+										value={newCombo.name}
+										onChange={(e) =>
+											setNewCombo({ ...newCombo, name: e.target.value })
+										}
+									/>
+								</div>
+								<div className="w-1/3">
+									<label
+										htmlFor="combo-type"
+										className="block text-sm font-bold text-slate-700 mb-1"
+									>
+										Loại
+									</label>
+									<select
+										id="combo-type"
+										className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none bg-slate-50"
+										value={newCombo.type || "combo"}
+										onChange={(e) =>
+											setNewCombo({
+												...newCombo,
+												type: e.target.value as "combo" | "product",
+											})
+										}
+									>
+										<option value="combo">Combo (Nhiều món)</option>
+										<option value="product">Sản phẩm đơn</option>
+									</select>
+								</div>
 							</div>
 
 							<div className="flex gap-4">
@@ -394,21 +460,110 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 									}
 								/>
 							</div>
-							<div>
-								<label
-									htmlFor="combo-items"
-									className="block text-sm font-bold text-slate-700 mb-1"
-								>
-									Danh sách món (phân cách bằng dấu phẩy)
-								</label>
-								<input
-									id="combo-items"
-									required
-									className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-									value={itemsInput}
-									onChange={(e) => setItemsInput(e.target.value)}
-								/>
-							</div>
+							{(newCombo.type === "combo" || !newCombo.type) && (
+								<div>
+									<label
+										htmlFor="combo-items"
+										className="block text-sm font-bold text-slate-700 mb-1"
+									>
+										Danh sách món (phân cách bằng dấu phẩy)
+									</label>
+									<input
+										id="combo-items"
+										required
+										className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+										value={itemsInput}
+										onChange={(e) => setItemsInput(e.target.value)}
+										placeholder="Ví dụ: Gà rán, Khoai tây, Pepsi"
+									/>
+								</div>
+							)}
+
+							{newCombo.type === "product" && (
+								<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+									<label htmlFor="variant-list" className="block text-sm font-bold text-slate-700 mb-3">
+										Biến thể sản phẩm (Variants)
+									</label>
+									<div className="space-y-3 mb-4" id="variants-list">
+										{tempVariants.map((v, idx) => (
+											<div
+												key={v.name + v.values.reverse().join("-")}
+												className="flex items-center justify-between bg-white p-2 rounded border border-slate-200"
+											>
+												<div>
+													<span className="font-bold text-slate-800">
+														{v.name}:
+													</span>{" "}
+													<span className="text-slate-600">
+														{v.values.join(", ")}
+													</span>
+												</div>
+												<button
+													type="button"
+													onClick={() => removeVariant(idx)}
+													className="text-red-500 hover:bg-red-50 p-1 rounded"
+												>
+													<Trash2 size={16} />
+												</button>
+											</div>
+										))}
+									</div>
+
+									<div className="flex gap-2 items-end">
+										<div className="w-1/3">
+											<input
+												className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+												placeholder="Tên (VD: Size)"
+												value={newVariantName}
+												onChange={(e) => setNewVariantName(e.target.value)}
+											/>
+										</div>
+										<div className="flex-1">
+											<input
+												className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+												placeholder="Giá trị (VD: S, M, L)"
+												value={newVariantValues}
+												onChange={(e) => setNewVariantValues(e.target.value)}
+											/>
+										</div>
+										<button
+											type="button"
+											onClick={addVariant}
+											className="bg-slate-800 text-white p-2 rounded-lg font-bold text-sm hover:bg-black transition"
+										>
+											Thêm
+										</button>
+									</div>
+
+									{tempVariants.length > 0 && (
+										<div className="mt-4 border-t border-slate-200 pt-4">
+											<h4 className="text-sm font-bold text-slate-700 mb-2">Ảnh biến thể (Tùy chọn)</h4>
+											<div className="space-y-2">
+												{Array.from(new Set(tempVariants.flatMap(v => v.values))).map(val => (
+													<div key={val} className="flex items-center gap-2">
+														<span className="text-sm text-slate-600 w-20 truncate" title={val}>{val}</span>
+														<input
+															className="flex-1 p-2 border border-slate-300 rounded-lg text-sm"
+															placeholder={`URL ảnh cho ${val}`}
+															value={newCombo.variantImages?.[val] || ""}
+															onChange={(e) => setNewCombo({
+																...newCombo,
+																variantImages: {
+																	...newCombo.variantImages,
+																	[val]: e.target.value
+																}
+															})}
+														/>
+														{newCombo.variantImages?.[val] && (
+															<img src={newCombo.variantImages[val]} alt="" className="w-8 h-8 rounded object-cover border border-slate-200" />
+														)}
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							)}
 
 							<div className="flex gap-4 mt-8 pt-4 border-t border-slate-100">
 								<button

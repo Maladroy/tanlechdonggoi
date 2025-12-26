@@ -1,5 +1,10 @@
 export type ComboStatus = "available" | "out_of_stock" | "hidden";
 
+export interface VariantOption {
+	name: string; // e.g. "Size", "Color"
+	values: string[]; // e.g. ["S", "M", "L"]
+}
+
 export type TupleSort = Date | number | string;
 export interface Combo {
 	id: string;
@@ -14,6 +19,9 @@ export interface Combo {
 	link?: string; // Optional now as we use cart
 	coupon?: string; // Specific coupon code for this item
 	status?: ComboStatus;
+	type?: "combo" | "product"; // Default is 'combo' if undefined
+	variants?: VariantOption[];
+	variantImages?: Record<string, string>; // Map of variant value to image URL
 }
 
 export interface Category {
@@ -37,6 +45,7 @@ export interface Coupon {
 
 export interface CartItem extends Combo {
 	quantity: number;
+	selectedVariants?: Record<string, string>;
 }
 
 export interface UserProfile {

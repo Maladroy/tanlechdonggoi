@@ -16,6 +16,8 @@
 		"@google/genai": "^1.31.0",
 		"@tailwindcss/vite": "^4.1.17",
 		"@tanstack/react-form": "^1.27.2",
+		"@thumbmarkjs/react": "^1.0.1",
+		"@thumbmarkjs/thumbmarkjs": "^1.6.1",
 		"@types/react": "^19.2.7",
 		"@types/react-dom": "^19.2.3",
 		"@vercel/analytics": "^1.6.1",

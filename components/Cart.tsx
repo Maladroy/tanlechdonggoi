@@ -25,8 +25,12 @@ interface Props {
 	onClose: () => void;
 	cart: CartItem[];
 	user: UserProfile | null;
-	onRemove: (id: string) => void;
-	onUpdateQuantity: (id: string, delta: number) => void;
+	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
+	onUpdateQuantity: (
+		id: string,
+		delta: number,
+		selectedVariants?: Record<string, string>,
+	) => void;
 	coupons: Coupon[];
 	initialCouponCode?: string | null;
 	onClearCart: () => void;
@@ -55,6 +59,8 @@ export const Cart: React.FC<Props> = ({
 	const [couponInput, setCouponInput] = useState("");
 	const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 	const [hasAutoApplied, setHasAutoApplied] = useState(false);
+	const [isCoolingDown, setIsCoolingDown] = useState(false);
+	const COOLDOWN_TIME = 60000; // 60 seconds
 
 	// Form logic
 	const form = useForm({
@@ -66,6 +72,14 @@ export const Cart: React.FC<Props> = ({
 			zipCode: "",
 		},
 		onSubmit: async ({ value }) => {
+			// Check cooldown
+			const lastOrder = localStorage.getItem("lastOrderTime");
+			if (lastOrder && Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME) {
+				// eslint-disable-next-line no-alert
+				alert("Vui lòng đợi 1 phút trước khi đặt đơn tiếp theo!");
+				return;
+			}
+
 			const { total } = calculateTotal();
 			let orderUser = user;
 			let userId = auth.currentUser?.uid;
@@ -93,6 +107,10 @@ export const Cart: React.FC<Props> = ({
 			});
 
 			if (success) {
+				localStorage.setItem("lastOrderTime", Date.now().toString());
+				setIsCoolingDown(true);
+				setTimeout(() => setIsCoolingDown(false), COOLDOWN_TIME);
+
 				onClearCart();
 				onOrderSuccess();
 				setStep("cart"); // Reset step
@@ -138,7 +156,7 @@ export const Cart: React.FC<Props> = ({
 
 	// Coupon Logic
 	const handleApplyCoupon = useCallback(
-		async (codeOverride?: string) => {
+		async (codeOverride?: string, silent = false) => {
 			const code = codeOverride || couponInput;
 			if (!code) return;
 			setIsValidatingCoupon(true);
@@ -177,7 +195,9 @@ export const Cart: React.FC<Props> = ({
 				if (!codeOverride) setCouponInput("");
 			} catch (e: unknown) {
 				const error = e as Error;
-				setCouponError(error.message || "Lỗi kiểm tra mã");
+				if (!silent) {
+					setCouponError(error.message || "Lỗi kiểm tra mã");
+				}
 				setAppliedCoupon(null);
 			} finally {
 				setIsValidatingCoupon(false);
@@ -188,7 +208,21 @@ export const Cart: React.FC<Props> = ({
 
 	// Effects
 	useEffect(() => {
-		if (!isOpen) setHasAutoApplied(false);
+		if (!isOpen) {
+			setHasAutoApplied(false);
+		} else {
+			// Check cooldown when opening
+			const lastOrder = localStorage.getItem("lastOrderTime");
+			if (
+				lastOrder &&
+				Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME
+			) {
+				setIsCoolingDown(true);
+				const remaining =
+					COOLDOWN_TIME - (Date.now() - Number.parseInt(lastOrder));
+				setTimeout(() => setIsCoolingDown(false), remaining);
+			}
+		}
 	}, [isOpen]);
 
 	useEffect(() => {
@@ -205,7 +239,7 @@ export const Cart: React.FC<Props> = ({
 				return;
 			for (const code of user.ownedCoupons) {
 				if (user.usedCoupons?.includes(code)) continue;
-				await handleApplyCoupon(code);
+				await handleApplyCoupon(code, true);
 				if (appliedCoupon) break;
 			}
 			setHasAutoApplied(true);
@@ -249,6 +283,20 @@ export const Cart: React.FC<Props> = ({
 						<h2 className="font-bold text-xl text-gray-800">
 							{step === "cart" ? `Giỏ Hàng (${cart.length})` : "Thanh Toán"}
 						</h2>
+						{step === "cart" && cart.length > 0 && (
+							<button
+								type="button"
+								onClick={() => {
+									if (window.confirm("Bạn có chắc muốn xóa hết giỏ hàng không?")) {
+										onClearCart();
+									}
+								}}
+								className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+								title="Xóa hết giỏ hàng"
+							>
+								<Trash2 size={20} />
+							</button>
+						)}
 					</div>
 					<button
 						type="button"
@@ -478,14 +526,16 @@ export const Cart: React.FC<Props> = ({
 										<button
 											type="submit"
 											form="checkout-form" // Links to the form ID above
-											disabled={!canSubmit || isSubmitting}
-											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
+											disabled={!canSubmit || isSubmitting || isCoolingDown}
+											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting || isCoolingDown
 												? "opacity-70 cursor-not-allowed"
 												: ""
 												}`}
 										>
 											{isSubmitting ? (
 												<Loader2 size={20} className="animate-spin" />
+											) : isCoolingDown ? (
+												"Vui lòng đợi..."
 											) : (
 												"Xác nhận đặt hàng"
 											)}
@@ -534,7 +584,16 @@ const CartItemRow = ({
 	appliedCoupon,
 	onUpdateQuantity,
 	onRemove,
-}: any) => (
+}: {
+	item: CartItem;
+	appliedCoupon: Coupon | null;
+	onUpdateQuantity: (
+		id: string,
+		delta: number,
+		selectedVariants?: Record<string, string>,
+	) => void;
+	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
+}) => (
 	<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
 		<div className="relative w-20 h-20 shrink-0">
 			<img
@@ -553,6 +612,19 @@ const CartItemRow = ({
 				<h3 className="font-bold text-gray-800 text-sm truncate">
 					{item.name}
 				</h3>
+				{item.selectedVariants &&
+					Object.keys(item.selectedVariants).length > 0 && (
+						<div className="flex flex-wrap gap-1 mt-1">
+							{Object.entries(item.selectedVariants).map(([key, value]) => (
+								<span
+									key={key}
+									className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200"
+								>
+									{value}
+								</span>
+							))}
+						</div>
+					)}
 				<p className="text-orange-600 font-bold text-sm mt-0.5">
 					{item.price.toLocaleString("vi-VN")}₫
 				</p>
@@ -561,7 +633,9 @@ const CartItemRow = ({
 				<div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-200">
 					<button
 						type="button"
-						onClick={() => onUpdateQuantity(item.id, -1)}
+						onClick={() =>
+							onUpdateQuantity(item.id, -1, item.selectedVariants)
+						}
 						disabled={item.quantity <= 1}
 						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all"
 					>
@@ -572,7 +646,7 @@ const CartItemRow = ({
 					</span>
 					<button
 						type="button"
-						onClick={() => onUpdateQuantity(item.id, 1)}
+						onClick={() => onUpdateQuantity(item.id, 1, item.selectedVariants)}
 						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all"
 					>
 						<Plus size={12} />
@@ -580,7 +654,7 @@ const CartItemRow = ({
 				</div>
 				<button
 					type="button"
-					onClick={() => onRemove(item.id)}
+					onClick={() => onRemove(item.id, item.selectedVariants)}
 					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
 				>
 					<Trash2 size={16} />

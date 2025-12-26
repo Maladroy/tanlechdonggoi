@@ -3,7 +3,7 @@ import type { Unsubscribe } from "firebase/firestore";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AdminDashboard } from "./components/AdminDashboard";
-import { AICodeHunter } from "./components/AICodeHunter";
+import { CouponDisplay } from "./components/CouponDisplay";
 import { AuthGate } from "./components/AuthGate";
 import { Cart } from "./components/Cart";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
@@ -38,9 +38,21 @@ const App: React.FC = () => {
 
 	// Cart State
 	const [isCartOpen, setIsCartOpen] = useState(false);
-	const [cart, setCart] = useState<CartItem[]>([]);
+	const [cart, setCart] = useState<CartItem[]>(() => {
+		try {
+			const saved = localStorage.getItem("tanlech_cart");
+			return saved ? JSON.parse(saved) : [];
+		} catch {
+			return [];
+		}
+	});
 	const [appliedCode, setAppliedCode] = useState<string | null>(null);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+
+	// Persist Cart
+	useEffect(() => {
+		localStorage.setItem("tanlech_cart", JSON.stringify(cart));
+	}, [cart]);
 	const [coupons, setCoupons] = useState<Coupon[]>([]);
 	const [categories, setCategories] = useState<Category[]>([]);
 	const [selectedComboId, setSelectedComboId] = useState<string | null>(null);
@@ -150,29 +162,87 @@ const App: React.FC = () => {
 	};
 
 	// Cart Handlers
-	const addToCart = (combo: Combo) => {
+	const addToCart = (
+		combo: Combo & { selectedVariants?: Record<string, string> },
+		options: { openCart?: boolean } = { openCart: true },
+	) => {
 		setCart((prev) => {
-			const existing = prev.find((item) => item.id === combo.id);
+			// Find existing item with same ID AND same selected variants
+			const existing = prev.find((item) => {
+				const isSameId = item.id === combo.id;
+				const isSameVariants =
+					JSON.stringify(item.selectedVariants || {}) ===
+					JSON.stringify(combo.selectedVariants || {});
+				return isSameId && isSameVariants;
+			});
+
 			if (existing) {
-				return prev.map((item) =>
-					item.id === combo.id
+				return prev.map((item) => {
+					// Compare logic again for map
+					const isSameId = item.id === combo.id;
+					const isSameVariants =
+						JSON.stringify(item.selectedVariants || {}) ===
+						JSON.stringify(combo.selectedVariants || {});
+
+					return isSameId && isSameVariants
 						? { ...item, quantity: item.quantity + 1 }
-						: item,
-				);
+						: item;
+				});
 			}
-			return [...prev, { ...combo, quantity: 1 }];
+
+			// Add new item with quantity 1
+			// Ensure we spread selectedVariants into the cart item
+			const newItem: CartItem = {
+				...combo,
+				quantity: 1,
+				selectedVariants: combo.selectedVariants,
+			};
+			return [...prev, newItem];
 		});
-		setIsCartOpen(true);
+		if (options.openCart) {
+			setIsCartOpen(true);
+		}
 	};
 
-	const removeFromCart = (id: string) => {
-		setCart((prev) => prev.filter((item) => item.id !== id));
+	const removeFromCart = (
+		id: string,
+		selectedVariants?: Record<string, string>,
+	) => {
+		setCart((prev) =>
+			prev.filter((item) => {
+				const isSameId = item.id === id;
+				// If variants provided, check them. If item has variants but we didn't pass specific ones (legacy call), maybe remove all?
+				// But best to match exactly.
+				// However, removeFromCart usually just passed ID.
+				// We need to update removeFromCart to pass variants too if we want to remove specific variant item.
+				// For now, let's assume we need to update the caller too.
+				// But wait, the ID is not unique anymore in the cart list if we have multiple variants of same product.
+				// So we really should generate a unique cartItemId or pass variants to remove.
+				// To keep it simple without changing CartItem ID structure (which matches Product ID),
+				// we will compare variants.
+				const isSameVariants =
+					JSON.stringify(item.selectedVariants || {}) ===
+					JSON.stringify(selectedVariants || {});
+
+				// Remove if ID matches AND Variants match
+				return !(isSameId && isSameVariants);
+			}),
+		);
 	};
 
-	const updateQuantity = (id: string, delta: number) => {
+	const updateQuantity = (
+		id: string,
+		delta: number,
+		selectedVariants?: Record<string, string>,
+	) => {
 		setCart((prev) =>
 			prev.map((item) => {
-				if (item.id === id) {
+				const isSameId = item.id === id;
+				const isSameVariants =
+					JSON.stringify(item.selectedVariants || {}) ===
+					JSON.stringify(selectedVariants || {});
+
+				if (isSameId && isSameVariants) {
 					const newQuantity = Math.max(1, item.quantity + delta);
 					return { ...item, quantity: newQuantity };
 				}
@@ -241,7 +311,7 @@ const App: React.FC = () => {
 
 			case AppView.COUPON_LIST:
 				return (
-					<AICodeHunter
+					<CouponDisplay
 						onBack={() => setView(AppView.SHOP)}
 						onGoToShop={() => setView(AppView.SHOP)}
 						onApply={handleApplyCode}
@@ -306,8 +376,8 @@ const App: React.FC = () => {
 							isOpen={!!selectedComboId}
 							combo={selectedCombo}
 							onClose={handleCloseProductModal}
-							onAddToCart={(combo) => {
-								addToCart(combo);
+							onAddToCart={(combo, options) => {
+								addToCart(combo, options);
 								handleCloseProductModal();
 							}}
 						/>
