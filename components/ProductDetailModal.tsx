@@ -1,7 +1,7 @@
+/** biome-ignore-all lint/a11y/noStaticElementInteractions: <NO> */
 import { Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { useEffect, useState } from "react";
 import type { Combo } from "../types";
 import MarkdownRenderer from "./MarkdownRenderer";
 
@@ -9,7 +9,7 @@ interface Props {
     combo: Combo | null;
     isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (combo: Combo) => void;
+    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string> }) => void;
 }
 
 const TagBadge = ({ tag }: { tag: string }) => {
@@ -50,6 +50,12 @@ export const ProductDetailModal: React.FC<Props> = ({
 }) => {
     const [copied, setCopied] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false);
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+
+    // Reset selection when combo changes
+    useEffect(() => {
+        setSelectedVariants({});
+    }, [combo?.id]);
 
     if (!isOpen || !combo) return null;
 
@@ -60,12 +66,28 @@ export const ProductDetailModal: React.FC<Props> = ({
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleAddToCart = () => {
+        // If it's a product and has variants, ensure all are selected
+        if (combo.type === 'product' && combo.variants?.length) {
+            const missing = combo.variants.find(v => !selectedVariants[v.name]);
+            if (missing) {
+                alert(`Vui lòng chọn ${missing.name}`);
+                return;
+            }
+        }
+
+        onAddToCart({
+            ...combo,
+            selectedVariants
+        });
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             {/* Zoom Overlay */}
             {isZoomed && (
                 <div
-                    className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+                    className="fixed inset-0 z-60 bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
                     onClick={() => setIsZoomed(false)}
                     onKeyDown={(e) => e.key === "Escape" && setIsZoomed(false)}
                 >
@@ -144,7 +166,38 @@ export const ProductDetailModal: React.FC<Props> = ({
                             <MarkdownRenderer content={combo.description} />
                         </div>
 
-                        {combo.items.length > 1 && (
+                        {/* Variant Selection */}
+                        {combo.type === "product" && combo.variants && combo.variants.length > 0 && (
+                            <div className="mb-8 space-y-4">
+                                {combo.variants.map((variant) => (
+                                    <div key={variant.name}>
+                                        <h3 className="font-bold text-sm text-gray-800 mb-2">
+                                            {variant.name}:
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {variant.values.map((val) => {
+                                                const isSelected = selectedVariants[variant.name] === val;
+                                                return (
+                                                    <button
+                                                        key={val}
+                                                        type="button"
+                                                        onClick={() => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
+                                                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${isSelected
+                                                            ? "bg-orange-600 text-white border-orange-600 shadow-md"
+                                                            : "bg-white text-gray-600 border-gray-200 hover:border-orange-300"
+                                                            }`}
+                                                    >
+                                                        {val}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {(!combo.type || combo.type === 'combo') && combo.items.length > 1 && (
                             <div className="bg-orange-50 rounded-xl p-5 mb-8 border border-orange-100">
                                 <h3 className="font-bold text-sm text-orange-900 uppercase tracking-wider mb-3">
                                     Bao gồm trong combo:
@@ -164,10 +217,10 @@ export const ProductDetailModal: React.FC<Props> = ({
                         )}
 
                         {/* Actions */}
-                        <div className="flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100">
+                        <div className="flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100  pb-1">
                             <button
                                 type="button"
-                                onClick={() => onAddToCart(combo)}
+                                onClick={handleAddToCart}
                                 className="cursor-pointer flex-1 bg-gray-900 hover:bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center justify-center gap-2"
                             >
                                 Thêm Vào Giỏ <Plus size={20} />

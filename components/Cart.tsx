@@ -25,8 +25,12 @@ interface Props {
 	onClose: () => void;
 	cart: CartItem[];
 	user: UserProfile | null;
-	onRemove: (id: string) => void;
-	onUpdateQuantity: (id: string, delta: number) => void;
+	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
+	onUpdateQuantity: (
+		id: string,
+		delta: number,
+		selectedVariants?: Record<string, string>,
+	) => void;
 	coupons: Coupon[];
 	initialCouponCode?: string | null;
 	onClearCart: () => void;
@@ -534,7 +538,16 @@ const CartItemRow = ({
 	appliedCoupon,
 	onUpdateQuantity,
 	onRemove,
-}: any) => (
+}: {
+	item: CartItem;
+	appliedCoupon: Coupon | null;
+	onUpdateQuantity: (
+		id: string,
+		delta: number,
+		selectedVariants?: Record<string, string>,
+	) => void;
+	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
+}) => (
 	<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
 		<div className="relative w-20 h-20 shrink-0">
 			<img
@@ -553,6 +566,19 @@ const CartItemRow = ({
 				<h3 className="font-bold text-gray-800 text-sm truncate">
 					{item.name}
 				</h3>
+				{item.selectedVariants &&
+					Object.keys(item.selectedVariants).length > 0 && (
+						<div className="flex flex-wrap gap-1 mt-1">
+							{Object.entries(item.selectedVariants).map(([key, value]) => (
+								<span
+									key={key}
+									className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200"
+								>
+									{value}
+								</span>
+							))}
+						</div>
+					)}
 				<p className="text-orange-600 font-bold text-sm mt-0.5">
 					{item.price.toLocaleString("vi-VN")}₫
 				</p>
@@ -561,7 +587,9 @@ const CartItemRow = ({
 				<div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-200">
 					<button
 						type="button"
-						onClick={() => onUpdateQuantity(item.id, -1)}
+						onClick={() =>
+							onUpdateQuantity(item.id, -1, item.selectedVariants)
+						}
 						disabled={item.quantity <= 1}
 						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all"
 					>
@@ -572,7 +600,7 @@ const CartItemRow = ({
 					</span>
 					<button
 						type="button"
-						onClick={() => onUpdateQuantity(item.id, 1)}
+						onClick={() => onUpdateQuantity(item.id, 1, item.selectedVariants)}
 						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all"
 					>
 						<Plus size={12} />
@@ -580,7 +608,7 @@ const CartItemRow = ({
 				</div>
 				<button
 					type="button"
-					onClick={() => onRemove(item.id)}
+					onClick={() => onRemove(item.id, item.selectedVariants)}
 					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
 				>
 					<Trash2 size={16} />
