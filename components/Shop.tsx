@@ -2,6 +2,7 @@ import { Flame, Percent, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { Category, Combo, UserProfile } from "../types";
+import { PromoBanner } from "./PromoBanner";
 
 interface Props {
   combos: Combo[];
@@ -106,13 +107,7 @@ export const Shop: React.FC<Props> = ({
       </header>
 
       {/* Promo Banner */}
-      <button
-        type="button"
-        className="w-full bg-linear-to-r from-red-600 to-orange-600 text-white text-center py-2 px-4 text-xs md:text-sm font-bold animate-pulse cursor-pointer hover:opacity-90 transition"
-        onClick={onOpenHunter}
-      >
-        🔥 BẠN ĐÃ CÓ MÃ GIẢM GIÁ CHƯA? VÀO LẤY NGAY 🔥
-      </button>
+      <PromoBanner onClick={onOpenHunter} />
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
         <div className="flex flex-col gap-4">

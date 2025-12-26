@@ -253,6 +253,20 @@ export const Cart: React.FC<Props> = ({
 						<h2 className="font-bold text-xl text-gray-800">
 							{step === "cart" ? `Giỏ Hàng (${cart.length})` : "Thanh Toán"}
 						</h2>
+						{step === "cart" && cart.length > 0 && (
+							<button
+								type="button"
+								onClick={() => {
+									if (window.confirm("Bạn có chắc muốn xóa hết giỏ hàng không?")) {
+										onClearCart();
+									}
+								}}
+								className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+								title="Xóa hết giỏ hàng"
+							>
+								<Trash2 size={20} />
+							</button>
+						)}
 					</div>
 					<button
 						type="button"

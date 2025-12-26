@@ -21,6 +21,7 @@ export interface Combo {
 	status?: ComboStatus;
 	type?: "combo" | "product"; // Default is 'combo' if undefined
 	variants?: VariantOption[];
+	variantImages?: Record<string, string>; // Map of variant value to image URL
 }
 
 export interface Category {

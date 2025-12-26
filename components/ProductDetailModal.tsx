@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/a11y/noStaticElementInteractions: <NO> */
-import { Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
+import { ArrowRight, Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import type { Combo } from "../types";
@@ -9,7 +9,7 @@ interface Props {
     combo: Combo | null;
     isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string> }) => void;
+    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string> }, options?: { openCart?: boolean }) => void;
 }
 
 const TagBadge = ({ tag }: { tag: string }) => {
@@ -51,11 +51,28 @@ export const ProductDetailModal: React.FC<Props> = ({
     const [copied, setCopied] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false);
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+    const [currentImage, setCurrentImage] = useState<string>("");
 
-    // Reset selection when combo changes
+    // Reset selection and image when combo changes
     useEffect(() => {
-        setSelectedVariants({});
-    }, [combo?.id]);
+        if (combo) {
+            setSelectedVariants({});
+            setCurrentImage(combo.imageUrl);
+        }
+    }, [combo?.id, combo?.imageUrl]);
+
+    // Update image based on variant selection
+    useEffect(() => {
+        if (combo?.variantImages && Object.keys(selectedVariants).length > 0) {
+            // Check if any selected variant value has a matching image
+            for (const value of Object.values(selectedVariants)) {
+                if (combo.variantImages[value]) {
+                    setCurrentImage(combo.variantImages[value]);
+                    break; // Use the first match
+                }
+            }
+        }
+    }, [selectedVariants, combo?.variantImages]);
 
     if (!isOpen || !combo) return null;
 
@@ -66,7 +83,7 @@ export const ProductDetailModal: React.FC<Props> = ({
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleAddToCart = () => {
+    const handleAddToCart = (openCart = true) => {
         // If it's a product and has variants, ensure all are selected
         if (combo.type === 'product' && combo.variants?.length) {
             const missing = combo.variants.find(v => !selectedVariants[v.name]);
@@ -79,7 +96,10 @@ export const ProductDetailModal: React.FC<Props> = ({
         onAddToCart({
             ...combo,
             selectedVariants
-        });
+        }, { openCart });
+
+        // Show a small notification or toast if not opening cart?
+        // For now relying on default behavior (App doesn't show toast, but we can assume user knows item added)
     };
 
     return (
@@ -92,7 +112,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                     onKeyDown={(e) => e.key === "Escape" && setIsZoomed(false)}
                 >
                     <img
-                        src={combo.imageUrl}
+                        src={currentImage}
                         alt={combo.name}
                         className="max-w-full max-h-full object-contain"
                     />
@@ -119,11 +139,11 @@ export const ProductDetailModal: React.FC<Props> = ({
                 </button>
 
                 {/* Scrollable Content Area */}
-                <div className="overflow-y-auto flex-1">
+                <div className="overflow-y-auto flex-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent">
                     {/* Image Section - Full Width */}
                     <div className="relative h-72 sm:h-96 w-full shrink-0 group bg-gray-100">
                         <img
-                            src={combo.imageUrl}
+                            src={currentImage || combo.imageUrl}
                             alt={combo.name}
                             className="w-full h-full object-cover cursor-zoom-in"
                             onClick={() => setIsZoomed(true)}
@@ -217,28 +237,33 @@ export const ProductDetailModal: React.FC<Props> = ({
                         )}
 
                         {/* Actions */}
-                        <div className="flex gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100  pb-1">
+                        <div className="flex flex-col sm:flex-row gap-3 sticky bottom-0 bg-white pt-4 border-t border-gray-100 pb-1">
                             <button
                                 type="button"
-                                onClick={handleAddToCart}
-                                className="cursor-pointer flex-1 bg-gray-900 hover:bg-orange-600 text-white py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center justify-center gap-2"
+                                onClick={() => handleAddToCart(false)}
+                                className="cursor-pointer flex-1 bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-50 py-3.5 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
-                                Thêm Vào Giỏ <Plus size={20} />
+                                <Plus size={20} /> Thêm Vào Giỏ
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleAddToCart(true)}
+                                className="cursor-pointer flex-1 bg-gray-900 hover:bg-orange-600 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                Mua Ngay <ArrowRight size={20} />
                             </button>
 
                             <button
                                 type="button"
                                 onClick={handleCopyLink}
-                                className="px-6 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition flex items-center gap-2"
+                                className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition flex items-center justify-center gap-2"
+                                title="Chia sẻ"
                             >
                                 {copied ? (
-                                    <>
-                                        <Check size={20} className="text-green-600" /> Đã chép
-                                    </>
+                                    <Check size={20} className="text-green-600" />
                                 ) : (
-                                    <>
-                                        <Share2 size={20} /> Chia sẻ
-                                    </>
+                                    <Share2 size={20} />
                                 )}
                             </button>
                         </div>

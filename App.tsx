@@ -38,9 +38,21 @@ const App: React.FC = () => {
 
 	// Cart State
 	const [isCartOpen, setIsCartOpen] = useState(false);
-	const [cart, setCart] = useState<CartItem[]>([]);
+	const [cart, setCart] = useState<CartItem[]>(() => {
+		try {
+			const saved = localStorage.getItem("tanlech_cart");
+			return saved ? JSON.parse(saved) : [];
+		} catch {
+			return [];
+		}
+	});
 	const [appliedCode, setAppliedCode] = useState<string | null>(null);
 	const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+
+	// Persist Cart
+	useEffect(() => {
+		localStorage.setItem("tanlech_cart", JSON.stringify(cart));
+	}, [cart]);
 	const [coupons, setCoupons] = useState<Coupon[]>([]);
 	const [categories, setCategories] = useState<Category[]>([]);
 	const [selectedComboId, setSelectedComboId] = useState<string | null>(null);
@@ -152,6 +164,7 @@ const App: React.FC = () => {
 	// Cart Handlers
 	const addToCart = (
 		combo: Combo & { selectedVariants?: Record<string, string> },
+		options: { openCart?: boolean } = { openCart: true },
 	) => {
 		setCart((prev) => {
 			// Find existing item with same ID AND same selected variants
@@ -186,7 +199,9 @@ const App: React.FC = () => {
 			};
 			return [...prev, newItem];
 		});
-		setIsCartOpen(true);
+		if (options.openCart) {
+			setIsCartOpen(true);
+		}
 	};
 
 	const removeFromCart = (
@@ -361,8 +376,8 @@ const App: React.FC = () => {
 							isOpen={!!selectedComboId}
 							combo={selectedCombo}
 							onClose={handleCloseProductModal}
-							onAddToCart={(combo) => {
-								addToCart(combo);
+							onAddToCart={(combo, options) => {
+								addToCart(combo, options);
 								handleCloseProductModal();
 							}}
 						/>
