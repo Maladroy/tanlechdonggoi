@@ -2,6 +2,7 @@ import { Flame, Percent, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { Category, Combo, UserProfile } from "../types";
+import { stripMarkdown } from "../utils";
 import { PromoBanner } from "./PromoBanner";
 
 interface Props {
@@ -241,7 +242,7 @@ export const Shop: React.FC<Props> = ({
                 </div>
 
                 <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-                  {combo.description}
+                  {stripMarkdown(combo.description)}
                 </p>
 
                 {combo.items.length > 1 && (

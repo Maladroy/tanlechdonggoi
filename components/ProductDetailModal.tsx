@@ -230,7 +230,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                         )}
 
                         {(!combo.type || combo.type === 'combo') && combo.items.length > 1 && (
-                            <div className="bg-orange-50 rounded-xl p-5 mb-8 border border-orange-100">
+                            <div className="bg-orange-50 rounded-xl p-5 my-8 border border-orange-100">
                                 <h3 className="font-bold text-sm text-orange-900 uppercase tracking-wider mb-3">
                                     Bao gồm trong combo:
                                 </h3>
