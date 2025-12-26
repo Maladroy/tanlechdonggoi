@@ -299,7 +299,7 @@ export const Shop: React.FC<Props> = ({
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto py-6 text-center text-gray-400 text-sm w-full border-t border-gray-100 bg-white/50 backdrop-blur-sm">
+      <footer className="mt-auto py-3 text-center text-gray-400 text-sm w-full">
         <p>© 2025 Tân Lếch Đóng Gói.</p>
       </footer>
     </div>

@@ -283,20 +283,7 @@ export const Cart: React.FC<Props> = ({
 						<h2 className="font-bold text-xl text-gray-800">
 							{step === "cart" ? `Giỏ Hàng (${cart.length})` : "Thanh Toán"}
 						</h2>
-						{step === "cart" && cart.length > 0 && (
-							<button
-								type="button"
-								onClick={() => {
-									if (window.confirm("Bạn có chắc muốn xóa hết giỏ hàng không?")) {
-										onClearCart();
-									}
-								}}
-								className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-								title="Xóa hết giỏ hàng"
-							>
-								<Trash2 size={20} />
-							</button>
-						)}
+
 					</div>
 					<button
 						type="button"
@@ -508,13 +495,32 @@ export const Cart: React.FC<Props> = ({
 										</p>
 									</div>
 								</div>
-								<button
-									type="button"
-									onClick={() => setStep("checkout")}
-									className="w-full bg-gray-900 hover:bg-black text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
-								>
-									Tiến hành đặt hàng <ChevronRight size={18} />
-								</button>
+								<div className="grid grid-cols-12 gap-3">
+									<button
+										type="button"
+										onClick={() => setStep("checkout")}
+										className="col-span-10 cursor-pointer w-full bg-gray-900 hover:bg-black text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+									>
+										Tiến hành đặt hàng <ChevronRight size={18} />
+									</button>
+
+									{step === "cart" && cart.length > 0 && (
+										<button
+											type="button"
+											onClick={() => {
+												if (window.confirm("Bạn có chắc muốn xóa hết giỏ hàng không?")) {
+													onClearCart();
+												}
+											}}
+											/* Đã thêm: flex items-center justify-center */
+											className="col-span-2 flex items-center justify-center py-2 px-1 text-red-500 bg-red-50 rounded-xl transition-colors cursor-pointer hover:bg-red-100 hover:text-red-600"
+											title="Xóa hết giỏ hàng"
+										>
+											<Trash2 size={20} />
+										</button>
+									)}
+								</div>
+
 							</div>
 						) : (
 							// CHECKOUT FOOTER
@@ -527,7 +533,7 @@ export const Cart: React.FC<Props> = ({
 											type="submit"
 											form="checkout-form" // Links to the form ID above
 											disabled={!canSubmit || isSubmitting || isCoolingDown}
-											className={`w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting || isCoolingDown
+											className={`cursor-pointer w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting || isCoolingDown
 												? "opacity-70 cursor-not-allowed"
 												: ""
 												}`}
@@ -545,8 +551,9 @@ export const Cart: React.FC<Props> = ({
 								<button
 									type="button"
 									onClick={() => setStep("cart")}
-									className="w-full text-gray-500 text-sm font-medium hover:text-gray-800 py-2"
+									className="w-full text-gray-500 text-sm font-medium hover:text-gray-800 py-2 cursor-pointer"
 								>
+									<ArrowLeft className="inline mr-1" />
 									Quay lại giỏ hàng
 								</button>
 							</div>
@@ -602,7 +609,7 @@ const CartItemRow = ({
 				className="w-full h-full object-cover rounded-lg bg-gray-50"
 			/>
 			{appliedCoupon?.applicableCombos?.includes(item.id) && (
-				<div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-sm">
+				<div className="absolute -top-2 -right-2 bg-green-500 text-white p-1 rounded-full shadow-sm cursor-pointer">
 					<Ticket size={10} />
 				</div>
 			)}
@@ -637,7 +644,7 @@ const CartItemRow = ({
 							onUpdateQuantity(item.id, -1, item.selectedVariants)
 						}
 						disabled={item.quantity <= 1}
-						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all"
+						className="p-1.5 hover:bg-white rounded-md text-gray-600 disabled:opacity-30 shadow-sm transition-all cursor-pointer"
 					>
 						<Minus size={12} />
 					</button>
@@ -647,7 +654,7 @@ const CartItemRow = ({
 					<button
 						type="button"
 						onClick={() => onUpdateQuantity(item.id, 1, item.selectedVariants)}
-						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all"
+						className="p-1.5 hover:bg-white rounded-md text-gray-600 shadow-sm transition-all cursor-pointer"
 					>
 						<Plus size={12} />
 					</button>
@@ -655,7 +662,7 @@ const CartItemRow = ({
 				<button
 					type="button"
 					onClick={() => onRemove(item.id, item.selectedVariants)}
-					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+					className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
 				>
 					<Trash2 size={16} />
 				</button>
@@ -685,7 +692,7 @@ const CouponSection = ({
 					<button
 						type="button"
 						onClick={onLoginRedirect}
-						className="font-bold text-gray-800 hover:text-orange-600 underline text-left"
+						className="cursor-pointer font-bold text-gray-800 hover:text-orange-600 underline text-left"
 					>
 						Đăng nhập để giảm giá
 					</button>

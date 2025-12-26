@@ -106,7 +106,11 @@ export const ProductDetailModal: React.FC<Props> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={onClose}
+            onKeyDown={(e) => e.key === "Escape" && onClose()}
+        >
             {/* Zoom Overlay */}
             {isZoomed && (
                 <div
@@ -171,22 +175,24 @@ export const ProductDetailModal: React.FC<Props> = ({
 
                     {/* Content Section */}
                     <div className="p-6 md:p-8">
-                        <div className="flex items-start justify-between gap-4 mb-8">
-                            <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                        <div className="mb-6 border-b border-gray-100 pb-6">
+                            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
                                 {combo.name}
                             </h2>
-                            <div className="flex flex-col items-end shrink-0">
-                                {combo.originalPrice > combo.price && (
-                                    <span className="text-gray-400 text-sm line-through decoration-red-500">
-                                        {combo.originalPrice.toLocaleString("vi-VN")}₫
-                                    </span>
-                                )}
-                                <span className="text-2xl font-black text-gray-900">
-                                    {combo.price.toLocaleString("vi-VN")}
-                                    <span className="text-xs font-normal text-gray-500 ml-1">
-                                        vnđ
-                                    </span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl md:text-3xl font-bold text-orange-600">
+                                    {combo.price.toLocaleString("vi-VN")}₫
                                 </span>
+                                {combo.originalPrice > combo.price && (
+                                    <>
+                                        <span className="text-base text-gray-400 line-through">
+                                            {combo.originalPrice.toLocaleString("vi-VN")}₫
+                                        </span>
+                                        <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded-md">
+                                            -{Math.round(((combo.originalPrice - combo.price) / combo.originalPrice) * 100)}%
+                                        </span>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -208,7 +214,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                                                         key={val}
                                                         type="button"
                                                         onClick={() => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
-                                                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${isSelected
+                                                        className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-medium border transition-all ${isSelected
                                                             ? "bg-orange-600 text-white border-orange-600 shadow-md"
                                                             : "bg-white text-gray-600 border-gray-200 hover:border-orange-300"
                                                             }`}
@@ -263,7 +269,7 @@ export const ProductDetailModal: React.FC<Props> = ({
                             <button
                                 type="button"
                                 onClick={handleCopyLink}
-                                className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition flex items-center justify-center gap-2"
+                                className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer"
                                 title="Chia sẻ"
                             >
                                 {copied ? (
