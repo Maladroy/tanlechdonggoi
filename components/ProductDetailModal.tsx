@@ -1,16 +1,17 @@
 /** biome-ignore-all lint/a11y/noStaticElementInteractions: <NO> */
 import { ArrowRight, Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { Combo } from "../types";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { Toast } from "./Toast";
+import { calculateVariantPrice, isVariantCombinationAvailable, migrateOldVariantData } from "../utils/variantUtils";
 
 interface Props {
     combo: Combo | null;
     isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string> }, options?: { openCart?: boolean }) => void;
+    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string>, computedPrice?: number }, options?: { openCart?: boolean }) => void;
 }
 
 const TagBadge = ({ tag }: { tag: string }) => {
@@ -52,8 +53,24 @@ export const ProductDetailModal: React.FC<Props> = ({
     const [copied, setCopied] = useState(false);
     const [showToast, setShowToast] = useState(false);
     const [isZoomed, setIsZoomed] = useState(false);
-    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}); // { "Size": "valueId" }
     const [currentImage, setCurrentImage] = useState<string>("");
+
+    // Ensure we work with new variant structure
+    const migratedVariants = useMemo(() => {
+        return combo ? migrateOldVariantData(combo.variants || []) : [];
+    }, [combo]);
+
+    // Calculate dynamic price
+    const currentPrice = useMemo(() => {
+        if (!combo) return 0;
+        return calculateVariantPrice(
+            combo.price,
+            selectedVariants,
+            migratedVariants,
+            combo.variantCombinationRules
+        );
+    }, [combo, selectedVariants, migratedVariants]);
 
     // Reset selection and image when combo changes
     useEffect(() => {
@@ -61,20 +78,40 @@ export const ProductDetailModal: React.FC<Props> = ({
             setSelectedVariants({});
             setCurrentImage(combo.imageUrl);
         }
-    }, [combo?.id, combo?.imageUrl]);
+    }, [combo]);
 
     // Update image based on variant selection
     useEffect(() => {
-        if (combo?.variantImages && Object.keys(selectedVariants).length > 0) {
+        if (migratedVariants && Object.keys(selectedVariants).length > 0) {
             // Check if any selected variant value has a matching image
-            for (const value of Object.values(selectedVariants)) {
-                if (combo.variantImages[value]) {
-                    setCurrentImage(combo.variantImages[value]);
-                    break; // Use the first match
+            // Prioritize the last selected variant (or specific order if needed)
+            // Here we iterate through options to find selected values and their images
+            for (const option of migratedVariants) {
+                const valueId = selectedVariants[option.name];
+                if (valueId) {
+                    const value = option.values.find(v => v.id === valueId);
+                    if (value?.imageUrl) {
+                        setCurrentImage(value.imageUrl);
+                        // We might want to break here if we only want to show one variant image
+                        // or continue if we have a hierarchy. Let's use the last one found that has an image.
+                    }
                 }
             }
+
+            // Fallback for legacy variantImages if needed, though we should prefer the new structure
+            if (combo?.variantImages) {
+                for (const option of migratedVariants) {
+                    const valueId = selectedVariants[option.name];
+                    const value = option.values.find(v => v.id === valueId);
+                    if (value && combo.variantImages[value.label]) {
+                        setCurrentImage(combo.variantImages[value.label]);
+                    }
+                }
+            }
+        } else if (combo) {
+            setCurrentImage(combo.imageUrl);
         }
-    }, [selectedVariants, combo?.variantImages]);
+    }, [selectedVariants, migratedVariants, combo]);
 
     if (!isOpen || !combo) return null;
 
@@ -87,22 +124,27 @@ export const ProductDetailModal: React.FC<Props> = ({
     };
 
     const handleAddToCart = (openCart = true) => {
-        // If it's a product and has variants, ensure all are selected
-        if (combo.type === 'product' && combo.variants?.length) {
-            const missing = combo.variants.find(v => !selectedVariants[v.name]);
+        // If it's a product and has variants, ensure all required are selected
+        if (combo.type === 'product' && migratedVariants.length > 0) {
+            const missing = migratedVariants.find(v => v.required && !selectedVariants[v.name]);
             if (missing) {
                 alert(`Vui lòng chọn ${missing.name}`);
+                return;
+            }
+
+            // Check availability
+            const availability = isVariantCombinationAvailable(selectedVariants, combo.variantCombinationRules);
+            if (!availability.available) {
+                alert(availability.reason || "Sự kết hợp này không khả dụng");
                 return;
             }
         }
 
         onAddToCart({
             ...combo,
-            selectedVariants
+            selectedVariants,
+            computedPrice: currentPrice
         }, { openCart });
-
-        // Show a small notification or toast if not opening cart?
-        // For now relying on default behavior (App doesn't show toast, but we can assume user knows item added)
     };
 
     return (
@@ -181,15 +223,15 @@ export const ProductDetailModal: React.FC<Props> = ({
                             </h2>
                             <div className="flex items-center gap-3">
                                 <span className="text-2xl md:text-3xl font-bold text-orange-600">
-                                    {combo.price.toLocaleString("vi-VN")}₫
+                                    {currentPrice.toLocaleString("vi-VN")}₫
                                 </span>
-                                {combo.originalPrice > combo.price && (
+                                {combo.originalPrice > currentPrice && (
                                     <>
                                         <span className="text-base text-gray-400 line-through">
                                             {combo.originalPrice.toLocaleString("vi-VN")}₫
                                         </span>
                                         <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded-md">
-                                            -{Math.round(((combo.originalPrice - combo.price) / combo.originalPrice) * 100)}%
+                                            -{Math.round(((combo.originalPrice - currentPrice) / combo.originalPrice) * 100)}%
                                         </span>
                                     </>
                                 )}
@@ -199,27 +241,52 @@ export const ProductDetailModal: React.FC<Props> = ({
                         <MarkdownRenderer content={combo.description} />
 
                         {/* Variant Selection */}
-                        {combo.type === "product" && combo.variants && combo.variants.length > 0 && (
+                        {combo.type === "product" && migratedVariants.length > 0 && (
                             <div className="mb-8 space-y-4">
-                                {combo.variants.map((variant) => (
-                                    <div key={variant.name}>
+                                {migratedVariants.map((variant) => (
+                                    <div key={variant.id}>
                                         <h3 className="font-bold text-sm text-gray-800 mb-2">
-                                            {variant.name}:
+                                            {variant.name} {variant.required && <span className="text-red-500">*</span>}:
                                         </h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {variant.values.map((val) => {
-                                                const isSelected = selectedVariants[variant.name] === val;
+                                            {variant.values.map((value) => {
+                                                const isSelected = selectedVariants[variant.name] === value.id;
+
+                                                // Check availability if this value is selected
+                                                // We construct a hypothetical selection
+                                                const hypotheticalSelection = { ...selectedVariants, [variant.name]: value.id };
+                                                const check = isVariantCombinationAvailable(hypotheticalSelection, combo.variantCombinationRules);
+                                                // Note: strict availability check might be too aggressive if user hasn't selected other required options yet.
+                                                // Usually we allow selection unless it explicitly violates a rule with *already selected* items.
+                                                // Our `isVariantCombinationAvailable` does subset matching so it works.
+
+                                                const isUnavailable = !check.available;
+
                                                 return (
                                                     <button
-                                                        key={val}
+                                                        key={value.id}
                                                         type="button"
-                                                        onClick={() => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
-                                                        className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-medium border transition-all ${isSelected
+                                                        disabled={isUnavailable}
+                                                        onClick={() => setSelectedVariants(prev => {
+                                                            const next = { ...prev, [variant.name]: value.id };
+                                                            // If clicking same value, maybe deselect? Optional. 
+                                                            // If required, maybe not allow deselect unless another is clicked.
+                                                            return next;
+                                                        })}
+                                                        className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-medium border transition-all relative ${isSelected
                                                             ? "bg-orange-600 text-white border-orange-600 shadow-md"
-                                                            : "bg-white text-gray-600 border-gray-200 hover:border-orange-300"
+                                                            : isUnavailable
+                                                                ? "bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed decoration-slice"
+                                                                : "bg-white text-gray-600 border-gray-200 hover:border-orange-300"
                                                             }`}
+                                                        title={isUnavailable ? check.reason : ""}
                                                     >
-                                                        {val}
+                                                        {value.label}
+                                                        {value.priceChange !== 0 && (
+                                                            <span className="text-xs ml-1 opacity-80">
+                                                                {value.priceChange > 0 ? '+' : ''}{value.priceChange.toLocaleString()}đ
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 );
                                             })}

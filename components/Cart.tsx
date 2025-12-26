@@ -19,6 +19,8 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { auth, createOrder, getOrdersByUser } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
+import { useMemo } from "react";
+import { migrateOldVariantData } from "../utils/variantUtils";
 
 interface Props {
 	isOpen: boolean;
@@ -120,7 +122,7 @@ export const Cart: React.FC<Props> = ({
 
 	// Calculations
 	const subtotal = cart.reduce(
-		(sum, item) => sum + item.price * item.quantity,
+		(sum, item) => sum + (item.computedPrice ?? item.price) * item.quantity,
 		0,
 	);
 
@@ -601,7 +603,28 @@ const CartItemRow = ({
 	) => void;
 	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
 }) => {
+	const migratedVariants = useMemo(() => migrateOldVariantData(item.variants || []), [item.variants]);
+
+	const getVariantLabel = (optionName: string, valueId: string) => {
+		const option = migratedVariants.find(o => o.name === optionName);
+		if (!option) return valueId;
+		const value = option.values.find(v => v.id === valueId || v.label === valueId);
+		return value ? value.label : valueId;
+	};
+
 	const displayImage = (() => {
+		// Try new image structure
+		if (item.selectedVariants && migratedVariants.length > 0) {
+			for (const option of migratedVariants) {
+				const valueId = item.selectedVariants[option.name];
+				if (valueId) {
+					const value = option.values.find(v => v.id === valueId);
+					if (value?.imageUrl) return value.imageUrl;
+				}
+			}
+		}
+
+		// Fallback to legacy structure
 		if (item.variantImages && item.selectedVariants) {
 			for (const value of Object.values(item.selectedVariants)) {
 				if (item.variantImages[value]) return item.variantImages[value];
@@ -637,13 +660,13 @@ const CartItemRow = ({
 										key={key}
 										className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200"
 									>
-										{value}
+										{getVariantLabel(key, value)}
 									</span>
 								))}
 							</div>
 						)}
 					<p className="text-orange-600 font-bold text-sm mt-0.5">
-						{item.price.toLocaleString("vi-VN")}₫
+						{(item.computedPrice ?? item.price).toLocaleString("vi-VN")}₫
 					</p>
 				</div>
 				<div className="flex justify-between items-center gap-2">

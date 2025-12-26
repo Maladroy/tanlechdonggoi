@@ -1,8 +1,30 @@
 export type ComboStatus = "available" | "out_of_stock" | "hidden";
 
+// New variant value structure with price adjustment
+export interface VariantValue {
+	id: string; // Unique identifier for the value
+	label: string; // Display name (e.g., "S", "Red", "Cotton")
+	priceChange: number; // Price adjustment (can be positive, negative, or 0)
+	order: number; // For drag-and-drop ordering
+	imageUrl?: string; // Optional image for this specific value
+}
+
+// Updated variant option structure
 export interface VariantOption {
+	id: string; // Unique identifier
 	name: string; // e.g. "Size", "Color"
-	values: string[]; // e.g. ["S", "M", "L"]
+	values: VariantValue[]; // Array of possible values
+	order: number; // For drag-and-drop ordering of variant types
+	required: boolean; // Whether user must select this variant
+}
+
+// Variant combination availability rules
+export interface VariantCombinationRule {
+	id: string;
+	combination: Record<string, string>; // { "Size": "S", "Color": "Red" }
+	isAvailable: boolean; // Whether this combination can be selected
+	reason?: string; // Optional reason for unavailability (e.g., "Out of stock")
+	customPriceAdjustment?: number; // Optional override for combination-specific pricing
 }
 
 export type TupleSort = Date | number | string;
@@ -21,7 +43,9 @@ export interface Combo {
 	status?: ComboStatus;
 	type?: "combo" | "product"; // Default is 'combo' if undefined
 	variants?: VariantOption[];
-	variantImages?: Record<string, string>; // Map of variant value to image URL
+	variantCombinationRules?: VariantCombinationRule[]; // Rules for combinations
+	defaultVariantImage?: string; // Fallback image when no variant selected
+	variantImages?: Record<string, string>; // DEPRECATED: Map of variant value to image URL
 }
 
 export interface Category {
@@ -46,6 +70,7 @@ export interface Coupon {
 export interface CartItem extends Combo {
 	quantity: number;
 	selectedVariants?: Record<string, string>;
+	computedPrice?: number; // Final price after variant adjustments
 }
 
 export interface UserProfile {

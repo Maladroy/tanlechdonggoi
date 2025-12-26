@@ -163,7 +163,7 @@ const App: React.FC = () => {
 
 	// Cart Handlers
 	const addToCart = (
-		combo: Combo & { selectedVariants?: Record<string, string> },
+		combo: Combo & { selectedVariants?: Record<string, string>; computedPrice?: number },
 		options: { openCart?: boolean } = { openCart: true },
 	) => {
 		setCart((prev) => {
@@ -196,6 +196,7 @@ const App: React.FC = () => {
 				...combo,
 				quantity: 1,
 				selectedVariants: combo.selectedVariants,
+				computedPrice: combo.computedPrice,
 			};
 			return [...prev, newItem];
 		});

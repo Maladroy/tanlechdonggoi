@@ -10,6 +10,9 @@ import {
 import ReactMarkdown from "react-markdown";
 import type { Category, Combo, ComboStatus, VariantOption } from "../../types";
 import MarkdownRenderer from "../MarkdownRenderer";
+import VariantManager from "./VariantManager";
+import CombinationRulesManager from "./CombinationRulesManager";
+import { migrateOldVariantData } from "../../utils/variantUtils";
 
 interface Props {
 	combos: Combo[];
@@ -32,14 +35,11 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 		category: "",
 		type: "combo",
 		variants: [],
+		variantCombinationRules: [],
 		variantImages: {},
 	});
 	const [itemsInput, setItemsInput] = useState("");
 	const [tagsInput, setTagsInput] = useState("");
-	// State for managing variants in the modal
-	const [tempVariants, setTempVariants] = useState<VariantOption[]>([]);
-	const [newVariantName, setNewVariantName] = useState("");
-	const [newVariantValues, setNewVariantValues] = useState("");
 
 	useEffect(() => {
 		getCategories().then(setCategories);
@@ -69,8 +69,8 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 			items: finalItems,
 			tags: tags.length ? tags : ["Mới"],
 			status: newCombo.status || "available",
-			variants: newCombo.type === "product" ? tempVariants : [],
 			type: newCombo.type || "combo",
+			// variants and variantCombinationRules are already in newCombo
 		};
 
 		if (editingComboId) {
@@ -84,10 +84,15 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 	};
 
 	const openEditCombo = (combo: Combo) => {
-		setNewCombo({ ...combo, type: combo.type || "combo" });
+		const migratedVariants = migrateOldVariantData(combo.variants || []);
+		setNewCombo({
+			...combo,
+			type: combo.type || "combo",
+			variants: migratedVariants,
+			variantCombinationRules: combo.variantCombinationRules || []
+		});
 		setItemsInput(combo.items.join(", "));
 		setTagsInput(combo.tags.join(", "));
-		setTempVariants(combo.variants || []);
 		setEditingComboId(combo.id);
 		setShowAddCombo(true);
 	};
@@ -107,28 +112,11 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 			category: "",
 			type: "combo",
 			variants: [],
+			variantCombinationRules: [],
 			variantImages: {},
 		});
 		setItemsInput("");
 		setTagsInput("");
-		setTempVariants([]);
-		setNewVariantName("");
-		setNewVariantValues("");
-	};
-
-	const addVariant = () => {
-		if (!newVariantName || !newVariantValues) return;
-		const values = newVariantValues.split(",").map((v) => v.trim());
-		setTempVariants([
-			...tempVariants,
-			{ name: newVariantName, values: values },
-		]);
-		setNewVariantName("");
-		setNewVariantValues("");
-	};
-
-	const removeVariant = (index: number) => {
-		setTempVariants(tempVariants.filter((_, i) => i !== index));
 	};
 
 	const handleDeleteCombo = async (id: string) => {
@@ -481,85 +469,17 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 
 							{newCombo.type === "product" && (
 								<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-									<label htmlFor="variant-list" className="block text-sm font-bold text-slate-700 mb-3">
-										Biến thể sản phẩm
-									</label>
-									<div className="space-y-3 mb-4" id="variants-list">
-										{tempVariants.map((v, idx) => (
-											<div
-												key={v.name + v.values.reverse().join("-")}
-												className="flex items-center justify-between bg-white p-2 rounded border border-slate-200"
-											>
-												<div>
-													<span className="font-bold text-slate-800">
-														{v.name}:
-													</span>{" "}
-													<span className="text-slate-600">
-														{v.values.join(", ")}
-													</span>
-												</div>
-												<button
-													type="button"
-													onClick={() => removeVariant(idx)}
-													className="text-red-500 hover:bg-red-50 p-1 rounded"
-												>
-													<Trash2 size={16} />
-												</button>
-											</div>
-										))}
-									</div>
-
-									<div className="flex gap-2 items-end">
-										<div className="w-1/3">
-											<input
-												className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-												placeholder="Tên (VD: Size)"
-												value={newVariantName}
-												onChange={(e) => setNewVariantName(e.target.value)}
+									<VariantManager
+										variants={newCombo.variants || []}
+										onChange={(variants) => setNewCombo({ ...newCombo, variants })}
+									/>
+									{(newCombo.variants?.length || 0) > 0 && (
+										<div className="mt-6 border-t border-slate-200 pt-6">
+											<CombinationRulesManager
+												variantOptions={newCombo.variants || []}
+												rules={newCombo.variantCombinationRules || []}
+												onChange={(rules) => setNewCombo({ ...newCombo, variantCombinationRules: rules })}
 											/>
-										</div>
-										<div className="flex-1">
-											<input
-												className="w-full p-2 border border-slate-300 rounded-lg text-sm"
-												placeholder="Giá trị (VD: S, M, L)"
-												value={newVariantValues}
-												onChange={(e) => setNewVariantValues(e.target.value)}
-											/>
-										</div>
-										<button
-											type="button"
-											onClick={addVariant}
-											className="bg-slate-800 text-white p-2 rounded-lg font-bold text-sm hover:bg-black transition"
-										>
-											Thêm
-										</button>
-									</div>
-
-									{tempVariants.length > 0 && (
-										<div className="mt-4 border-t border-slate-200 pt-4">
-											<h4 className="text-sm font-bold text-slate-700 mb-2">Ảnh (Tuỳ chọn)</h4>
-											<div className="space-y-2">
-												{Array.from(new Set(tempVariants.flatMap(v => v.values))).map(val => (
-													<div key={val} className="flex items-center gap-2">
-														<span className="text-sm text-slate-600 w-20 truncate" title={val}>{val}</span>
-														<input
-															className="flex-1 p-2 border border-slate-300 rounded-lg text-sm"
-															placeholder={`URL ảnh cho ${val}`}
-															value={newCombo.variantImages?.[val] || ""}
-															onChange={(e) => setNewCombo({
-																...newCombo,
-																variantImages: {
-																	...newCombo.variantImages,
-																	[val]: e.target.value
-																}
-															})}
-														/>
-														{newCombo.variantImages?.[val] && (
-															<img src={newCombo.variantImages[val]} alt="" className="w-8 h-8 rounded object-cover border border-slate-200" />
-														)}
-													</div>
-												))}
-											</div>
 										</div>
 									)}
 								</div>
