@@ -163,7 +163,7 @@ const App: React.FC = () => {
 
 	// Cart Handlers
 	const addToCart = (
-		combo: Combo & { selectedVariants?: Record<string, string> },
+		combo: Combo & { selectedVariants?: Record<string, string>; computedPrice?: number },
 		options: { openCart?: boolean } = { openCart: true },
 	) => {
 		setCart((prev) => {
@@ -191,11 +191,12 @@ const App: React.FC = () => {
 			}
 
 			// Add new item with quantity 1
-			// Ensure we spread selectedVariants into the cart item
+			// Ensure we spread selectedVariants and computedPrice into the cart item
 			const newItem: CartItem = {
 				...combo,
 				quantity: 1,
 				selectedVariants: combo.selectedVariants,
+				computedPrice: combo.computedPrice,
 			};
 			return [...prev, newItem];
 		});
@@ -325,7 +326,7 @@ const App: React.FC = () => {
 						<Shop
 							combos={combos}
 							categories={categories}
-							onOpenHunter={() => {
+							onOpenCouponPage={() => {
 								if (user) {
 									setView(AppView.COUPON_LIST);
 								} else {

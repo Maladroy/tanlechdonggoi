@@ -1,8 +1,15 @@
 /** biome-ignore-all lint/a11y/noStaticElementInteractions: <NO> */
 import { ArrowRight, Check, Flame, Maximize2, Percent, Plus, Share2, X } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Combo } from "../types";
+import {
+    calculateVariantPrice,
+    ensureNewVariantFormat,
+    formatPriceChange,
+    getVariantImageUrl,
+    isVariantCombinationAvailable,
+} from "../utils";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { Toast } from "./Toast";
 
@@ -10,7 +17,7 @@ interface Props {
     combo: Combo | null;
     isOpen: boolean;
     onClose: () => void;
-    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string> }, options?: { openCart?: boolean }) => void;
+    onAddToCart: (combo: Combo & { selectedVariants?: Record<string, string>; computedPrice?: number }, options?: { openCart?: boolean }) => void;
 }
 
 const TagBadge = ({ tag }: { tag: string }) => {
@@ -55,26 +62,44 @@ export const ProductDetailModal: React.FC<Props> = ({
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
     const [currentImage, setCurrentImage] = useState<string>("");
 
+    // Convert variants to new format if needed (for backward compatibility)
+    const normalizedVariants = useMemo(() => {
+        if (!combo?.variants) return [];
+        return ensureNewVariantFormat(combo.variants, combo.variantImages);
+    }, [combo?.variants, combo?.variantImages]);
+
+    // Calculate computed price based on selected variants
+    const computedPrice = useMemo(() => {
+        if (!combo || normalizedVariants.length === 0) return combo?.price || 0;
+        return calculateVariantPrice(
+            combo.price,
+            selectedVariants,
+            normalizedVariants,
+            combo.variantCombinationRules
+        );
+    }, [combo, selectedVariants, normalizedVariants]);
+
+    // Check if current combination is available
+    const combinationAvailability = useMemo(() => {
+        if (!combo?.variantCombinationRules) return { available: true };
+        return isVariantCombinationAvailable(selectedVariants, combo.variantCombinationRules);
+    }, [selectedVariants, combo?.variantCombinationRules]);
+
     // Reset selection and image when combo changes
     useEffect(() => {
         if (combo) {
             setSelectedVariants({});
             setCurrentImage(combo.imageUrl);
         }
-    }, [combo?.id, combo?.imageUrl]);
+    }, [combo]);
 
     // Update image based on variant selection
     useEffect(() => {
-        if (combo?.variantImages && Object.keys(selectedVariants).length > 0) {
-            // Check if any selected variant value has a matching image
-            for (const value of Object.values(selectedVariants)) {
-                if (combo.variantImages[value]) {
-                    setCurrentImage(combo.variantImages[value]);
-                    break; // Use the first match
-                }
-            }
+        if (normalizedVariants.length > 0 && Object.keys(selectedVariants).length > 0) {
+            const newImage = getVariantImageUrl(selectedVariants, normalizedVariants, combo?.imageUrl || "");
+            setCurrentImage(newImage);
         }
-    }, [selectedVariants, combo?.variantImages]);
+    }, [selectedVariants, normalizedVariants, combo?.imageUrl]);
 
     if (!isOpen || !combo) return null;
 
@@ -87,22 +112,26 @@ export const ProductDetailModal: React.FC<Props> = ({
     };
 
     const handleAddToCart = (openCart = true) => {
-        // If it's a product and has variants, ensure all are selected
-        if (combo.type === 'product' && combo.variants?.length) {
-            const missing = combo.variants.find(v => !selectedVariants[v.name]);
+        // If it's a product and has required variants, ensure all are selected
+        if (combo.type === 'product' && normalizedVariants.length > 0) {
+            const missing = normalizedVariants.find(v => v.required && !selectedVariants[v.id]);
             if (missing) {
                 alert(`Vui lòng chọn ${missing.name}`);
                 return;
             }
         }
 
+        // Check if combination is available
+        if (!combinationAvailability.available) {
+            alert(combinationAvailability.reason || "Kết hợp này hiện không khả dụng");
+            return;
+        }
+
         onAddToCart({
             ...combo,
-            selectedVariants
+            selectedVariants,
+            computedPrice: computedPrice,
         }, { openCart });
-
-        // Show a small notification or toast if not opening cart?
-        // For now relying on default behavior (App doesn't show toast, but we can assume user knows item added)
     };
 
     return (
@@ -174,8 +203,8 @@ export const ProductDetailModal: React.FC<Props> = ({
                     </div>
 
                     {/* Content Section */}
-                    <div className="p-6 md:p-8">
-                        <div className="mb-6 border-b border-gray-100 pb-6">
+                    <div className="p-6 md:p-8 ">
+                        <div className="border-b border-gray-100 pb-2">
                             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
                                 {combo.name}
                             </h2>
@@ -196,36 +225,64 @@ export const ProductDetailModal: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <MarkdownRenderer content={combo.description} />
+                        <div className="my-8">
+                            <MarkdownRenderer content={combo.description} />
+                        </div>
 
                         {/* Variant Selection */}
-                        {combo.type === "product" && combo.variants && combo.variants.length > 0 && (
-                            <div className="mb-8 space-y-4">
-                                {combo.variants.map((variant) => (
-                                    <div key={variant.name}>
+                        {combo.type === "product" && normalizedVariants.length > 0 && (
+                            <div className="space-y-4">
+                                {normalizedVariants.map((variant) => (
+                                    <div key={variant.id}>
                                         <h3 className="font-bold text-sm text-gray-800 mb-2">
                                             {variant.name}:
+                                            {variant.required && <span className="text-red-500 ml-1">*</span>}
                                         </h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {variant.values.map((val) => {
-                                                const isSelected = selectedVariants[variant.name] === val;
+                                            {variant.values.map((value) => {
+                                                const isSelected = selectedVariants[variant.id] === value.id;
+                                                const priceText = formatPriceChange(value.priceChange);
                                                 return (
                                                     <button
-                                                        key={val}
+                                                        key={value.id}
                                                         type="button"
-                                                        onClick={() => setSelectedVariants(prev => ({ ...prev, [variant.name]: val }))}
+                                                        onClick={() => setSelectedVariants(prev => ({ ...prev, [variant.id]: value.id }))}
                                                         className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-medium border transition-all ${isSelected
                                                             ? "bg-orange-600 text-white border-orange-600 shadow-md"
                                                             : "bg-white text-gray-600 border-gray-200 hover:border-orange-300"
                                                             }`}
                                                     >
-                                                        {val}
+                                                        {value.label}
+                                                        {priceText && (
+                                                            <span className={`ml-1 text-xs ${isSelected ? "text-orange-100" : value.priceChange > 0 ? "text-green-600" : "text-red-600"}`}>
+                                                                ({priceText})
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Show computed price when variants are selected */}
+                                {Object.keys(selectedVariants).length > 0 && computedPrice !== combo.price && (
+                                    <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">Giá sau khi chọn biến thể:</span>
+                                            <span className="text-lg font-bold text-orange-600">
+                                                {computedPrice.toLocaleString("vi-VN")}₫
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Show unavailable message */}
+                                {!combinationAvailability.available && (
+                                    <div className="mt-2 p-3 bg-red-50 rounded-lg border border-red-200 text-red-700 text-sm">
+                                        ⚠️ {combinationAvailability.reason || "Kết hợp này hiện không khả dụng"}
+                                    </div>
+                                )}
                             </div>
                         )}
 

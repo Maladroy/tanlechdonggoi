@@ -3,7 +3,7 @@ import remarkGfm from "remark-gfm";
 
 export default function MarkdownRenderer({ content }: { content: string }) {
     return (
-        <div className="prose prose-slate max-w-none bg-zinc-50 px-2.5 py-1 rounded-sm prose-headings:font-bold prose-headings:text-gray-800 prose-headings:mt-6 prose-headings:mb-3 prose-p:text-gray-600 prose-p:leading-relaxed prose-li:text-gray-600 prose-strong:text-gray-900 prose-strong:font-bold">
+        <div className="prose prose-slate max-w-none bg-zinc-50 p-3 rounded-sm prose-headings:font-bold prose-headings:text-gray-800 prose-headings:mt-6 prose-headings:mb-3 prose-p:text-gray-600 prose-p:leading-relaxed prose-li:text-gray-600 prose-strong:text-gray-900 prose-strong:font-bold">
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{

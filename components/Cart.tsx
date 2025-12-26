@@ -19,6 +19,7 @@ import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { auth, createOrder, getOrdersByUser } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
+import { ensureNewVariantFormat, getVariantsDisplayText, getVariantImageUrl } from "../utils";
 
 interface Props {
 	isOpen: boolean;
@@ -118,9 +119,9 @@ export const Cart: React.FC<Props> = ({
 		},
 	});
 
-	// Calculations
+	// Calculations - use computedPrice if available
 	const subtotal = cart.reduce(
-		(sum, item) => sum + item.price * item.quantity,
+		(sum, item) => sum + (item.computedPrice ?? item.price) * item.quantity,
 		0,
 	);
 
@@ -306,7 +307,7 @@ export const Cart: React.FC<Props> = ({
 									<div className="space-y-3">
 										{cart.map((item) => (
 											<CartItemRow
-												key={item.id}
+												key={item.id.concat(JSON.stringify(item.selectedVariants))}
 												item={item}
 												appliedCoupon={appliedCoupon}
 												onUpdateQuantity={onUpdateQuantity}
@@ -601,7 +602,13 @@ const CartItemRow = ({
 	) => void;
 	onRemove: (id: string, selectedVariants?: Record<string, string>) => void;
 }) => {
+	// Get display image - try new format first, then fall back to legacy
 	const displayImage = (() => {
+		if (item.variants && item.selectedVariants) {
+			const normalizedVariants = ensureNewVariantFormat(item.variants, item.variantImages);
+			return getVariantImageUrl(item.selectedVariants, normalizedVariants, item.imageUrl);
+		}
+		// Legacy fallback
 		if (item.variantImages && item.selectedVariants) {
 			for (const value of Object.values(item.selectedVariants)) {
 				if (item.variantImages[value]) return item.variantImages[value];
@@ -609,6 +616,18 @@ const CartItemRow = ({
 		}
 		return item.imageUrl;
 	})();
+
+	// Get variant display text
+	const variantDisplayText = (() => {
+		if (item.variants && item.selectedVariants && Object.keys(item.selectedVariants).length > 0) {
+			const normalizedVariants = ensureNewVariantFormat(item.variants, item.variantImages);
+			return getVariantsDisplayText(item.selectedVariants, normalizedVariants);
+		}
+		return null;
+	})();
+
+	// Use computed price if available
+	const displayPrice = item.computedPrice ?? item.price;
 
 	return (
 		<div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm transition hover:shadow-md">
@@ -629,7 +648,12 @@ const CartItemRow = ({
 					<h3 className="font-bold text-gray-800 text-sm truncate">
 						{item.name}
 					</h3>
-					{item.selectedVariants &&
+					{variantDisplayText ? (
+						<p className="text-[10px] text-gray-500 mt-0.5 truncate" title={variantDisplayText}>
+							{variantDisplayText}
+						</p>
+					) : (
+						item.selectedVariants &&
 						Object.keys(item.selectedVariants).length > 0 && (
 							<div className="flex flex-wrap gap-1 mt-1">
 								{Object.entries(item.selectedVariants).map(([key, value]) => (
@@ -641,9 +665,10 @@ const CartItemRow = ({
 									</span>
 								))}
 							</div>
-						)}
+						)
+					)}
 					<p className="text-orange-600 font-bold text-sm mt-0.5">
-						{item.price.toLocaleString("vi-VN")}₫
+						{displayPrice.toLocaleString("vi-VN")}₫
 					</p>
 				</div>
 				<div className="flex justify-between items-center gap-2">

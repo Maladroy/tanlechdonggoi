@@ -8,7 +8,7 @@ import { PromoBanner } from "./PromoBanner";
 interface Props {
   combos: Combo[];
   categories: Category[];
-  onOpenHunter: () => void;
+  onOpenCouponPage: () => void;
   onViewProduct: (combo: Combo) => void;
   onAddToCart: (combo: Combo) => void;
   cartItemCount: number;
@@ -20,7 +20,7 @@ interface Props {
 export const Shop: React.FC<Props> = ({
   combos,
   categories,
-  onOpenHunter,
+  onOpenCouponPage,
   onViewProduct,
   onAddToCart,
   cartItemCount,
@@ -72,7 +72,7 @@ export const Shop: React.FC<Props> = ({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onOpenHunter}
+              onClick={onOpenCouponPage}
               className="flex items-center gap-1 bg-yellow-100 text-orange-700 px-3 py-2 rounded-full text-sm font-semibold hover:bg-yellow-200 transition"
             >
               <Tag size={16} /> <span className="hidden sm:inline">Săn Mã</span>
@@ -108,7 +108,7 @@ export const Shop: React.FC<Props> = ({
       </header>
 
       {/* Promo Banner */}
-      <PromoBanner onClick={onOpenHunter} />
+      <PromoBanner onClick={onOpenCouponPage} />
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
         <div className="flex flex-col gap-4">
