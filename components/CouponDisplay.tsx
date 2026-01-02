@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { getCoupons } from "../services/firebase";
+import { getCoupons, getSystemSettings } from "../services/firebase";
 import type { Coupon } from "../types";
 
 interface Props {
@@ -28,12 +28,23 @@ export const CouponDisplay: React.FC<Props> = ({
 	const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
 	useEffect(() => {
-		const fetch = async () => {
-			const data = await getCoupons();
-			setCoupons(data);
+		const fetchData = async () => {
+			const [data, settings] = await Promise.all([
+				getCoupons(),
+				getSystemSettings(),
+			]);
+
+			// Filter out the first-timer coupon (defined in settings.newUserCouponCode)
+			// This coupon should not be publicly displayed - it's only for new users
+			const newUserCouponCode = settings?.newUserCouponCode?.toUpperCase();
+			const publicCoupons = newUserCouponCode
+				? data.filter((coupon) => coupon.code.toUpperCase() !== newUserCouponCode)
+				: data;
+
+			setCoupons(publicCoupons);
 			setLoading(false);
 		};
-		fetch();
+		fetchData();
 	}, []);
 
 	const handleCopy = (code: string) => {

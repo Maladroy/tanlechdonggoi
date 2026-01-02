@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { auth, createOrder, getOrdersByUser } from "../services/firebase";
+import { auth, createOrder, getOrdersByUser, getSystemSettings } from "../services/firebase";
 import type { CartItem, Coupon, UserProfile } from "../types";
 import { ensureNewVariantFormat, getVariantsDisplayText, getVariantImageUrl } from "../utils";
 
@@ -60,8 +60,6 @@ export const Cart: React.FC<Props> = ({
 	const [couponInput, setCouponInput] = useState("");
 	const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 	const [hasAutoApplied, setHasAutoApplied] = useState(false);
-	const [isCoolingDown, setIsCoolingDown] = useState(false);
-	const COOLDOWN_TIME = 60000; // 60 seconds
 
 	// Form logic
 	const form = useForm({
@@ -73,14 +71,6 @@ export const Cart: React.FC<Props> = ({
 			zipCode: "",
 		},
 		onSubmit: async ({ value }) => {
-			// Check cooldown
-			const lastOrder = localStorage.getItem("lastOrderTime");
-			if (lastOrder && Date.now() - Number.parseInt(lastOrder, 10) < COOLDOWN_TIME) {
-				// eslint-disable-next-line no-alert
-				alert("Vui lòng đợi 1 phút trước khi đặt đơn tiếp theo!");
-				return;
-			}
-
 			const { total } = calculateTotal();
 			let orderUser = user;
 			let userId = auth.currentUser?.uid;
@@ -92,29 +82,42 @@ export const Cart: React.FC<Props> = ({
 
 			if (!userId || !orderUser) return;
 
-			const success = await createOrder({
+			// Build order object, excluding undefined/null optional fields
+			const orderData: Parameters<typeof createOrder>[0] = {
 				userId: userId,
 				user: orderUser,
-				items: cart,
+				items: cart.map((item) => ({
+					...item,
+					// Ensure no undefined values in cart items
+					selectedVariants: item.selectedVariants || undefined,
+					computedPrice: item.computedPrice || undefined,
+				})),
 				total: total,
 				createdAt: new Date().toISOString(),
 				status: "pending",
-				appliedCoupon: appliedCoupon?.code ?? null,
 				shippingAddress: {
 					street: value.address,
 					city: value.city,
 					zipCode: value.zipCode,
 				},
-			});
+			};
+
+			// Only add appliedCoupon if it exists (Firestore doesn't accept null/undefined)
+			if (appliedCoupon?.code) {
+				orderData.appliedCoupon = appliedCoupon.code;
+			}
+
+			// Sanitize: remove undefined values recursively
+			const sanitizedOrder = JSON.parse(JSON.stringify(orderData));
+
+			const success = await createOrder(sanitizedOrder);
 
 			if (success) {
-				localStorage.setItem("lastOrderTime", Date.now().toString());
-				setIsCoolingDown(true);
-				setTimeout(() => setIsCoolingDown(false), COOLDOWN_TIME);
-
 				onClearCart();
 				onOrderSuccess();
 				setStep("cart"); // Reset step
+				setAppliedCoupon(null); // Reset applied coupon
+				form.reset(); // Reset form fields
 			}
 		},
 	});
@@ -155,11 +158,11 @@ export const Cart: React.FC<Props> = ({
 
 	const { discountAmount, total } = calculateTotal();
 
-	// Coupon Logic
+	// Coupon Logic - returns true if coupon was successfully applied
 	const handleApplyCoupon = useCallback(
-		async (codeOverride?: string, silent = false) => {
+		async (codeOverride?: string, silent = false): Promise<boolean> => {
 			const code = codeOverride || couponInput;
-			if (!code) return;
+			if (!code) return false;
 			setIsValidatingCoupon(true);
 			setCouponError("");
 
@@ -178,28 +181,39 @@ export const Cart: React.FC<Props> = ({
 					if (!hasItem) throw new Error("Mã không áp dụng cho sản phẩm này!");
 				}
 
-				if (user) {
-					if (user.usedCoupons?.includes(found.code))
-						throw new Error("Bạn đã dùng mã này rồi!");
-					if (found.isNewUserOnly) {
-						const orders = await getOrdersByUser(auth.currentUser?.uid || "");
-						if (orders.filter((o) => o.status !== "cancelled").length > 0) {
-							throw new Error("Mã chỉ dành cho khách mới!");
-						}
+				// Guest users cannot apply ANY coupons - must be logged in
+				if (!user) {
+					throw new Error("Vui lòng đăng nhập để dùng mã giảm giá!");
+				}
+
+				// Check if user already used this coupon
+				if (user.usedCoupons?.includes(found.code)) {
+					throw new Error("Bạn đã dùng mã này rồi!");
+				}
+
+				// Fetch settings to check if this is the first-timer coupon
+				const settings = await getSystemSettings();
+				const newUserCouponCode = settings?.newUserCouponCode?.toUpperCase();
+				const isFirstTimerCoupon = newUserCouponCode && code.toUpperCase() === newUserCouponCode;
+
+				// Check if this is a first-timer coupon and user already has orders
+				if (isFirstTimerCoupon) {
+					const orders = await getOrdersByUser(auth.currentUser?.uid || "");
+					if (orders.filter((o) => o.status !== "cancelled").length > 0) {
+						throw new Error("Mã chỉ dành cho khách mới!");
 					}
-				} else {
-					if (found.isNewUserOnly || found.maxUsesPerUser)
-						throw new Error("Vui lòng đăng nhập để dùng mã này!");
 				}
 
 				setAppliedCoupon(found);
 				if (!codeOverride) setCouponInput("");
+				return true;
 			} catch (e: unknown) {
 				const error = e as Error;
 				if (!silent) {
 					setCouponError(error.message || "Lỗi kiểm tra mã");
 				}
 				setAppliedCoupon(null);
+				return false;
 			} finally {
 				setIsValidatingCoupon(false);
 			}
@@ -211,42 +225,50 @@ export const Cart: React.FC<Props> = ({
 	useEffect(() => {
 		if (!isOpen) {
 			setHasAutoApplied(false);
-		} else {
-			// Check cooldown when opening
-			const lastOrder = localStorage.getItem("lastOrderTime");
-			if (
-				lastOrder &&
-				Date.now() - Number.parseInt(lastOrder) < COOLDOWN_TIME
-			) {
-				setIsCoolingDown(true);
-				const remaining =
-					COOLDOWN_TIME - (Date.now() - Number.parseInt(lastOrder));
-				setTimeout(() => setIsCoolingDown(false), remaining);
-			}
 		}
 	}, [isOpen]);
 
 	useEffect(() => {
 		const tryAutoApply = async () => {
+			// Must have: cart open, no coupon applied, not already tried, user has owned coupons,
+			// cart has items, AND coupons list is loaded from Firebase
 			if (
 				!(
 					isOpen &&
 					!appliedCoupon &&
 					!hasAutoApplied &&
 					user?.ownedCoupons?.length &&
-					cart.length > 0
+					cart.length > 0 &&
+					coupons.length > 0 // Wait for coupons to be loaded before trying
 				)
 			)
 				return;
+
+			// Fetch settings and user orders in parallel
+			const [settings, userOrders] = await Promise.all([
+				getSystemSettings(),
+				auth.currentUser?.uid ? getOrdersByUser(auth.currentUser.uid) : Promise.resolve([]),
+			]);
+
+			const newUserCouponCode = settings?.newUserCouponCode?.toUpperCase();
+			const hasCompletedOrders = userOrders.filter((o) => o.status !== "cancelled").length > 0;
+
 			for (const code of user.ownedCoupons) {
 				if (user.usedCoupons?.includes(code)) continue;
-				await handleApplyCoupon(code, true);
-				if (appliedCoupon) break;
+
+				// Skip first-timer coupon (from settings) if user already has orders
+				if (newUserCouponCode && code.toUpperCase() === newUserCouponCode && hasCompletedOrders) {
+					continue;
+				}
+
+				// Use the returned boolean to check if coupon was applied successfully
+				const success = await handleApplyCoupon(code, true);
+				if (success) break; // Stop trying if one was successfully applied
 			}
 			setHasAutoApplied(true);
 		};
 		tryAutoApply();
-	}, [isOpen, appliedCoupon, hasAutoApplied, user, cart, handleApplyCoupon]);
+	}, [isOpen, appliedCoupon, hasAutoApplied, user, cart, coupons, handleApplyCoupon]);
 
 	useEffect(() => {
 		if (isOpen && initialCouponCode && !appliedCoupon) {
@@ -533,16 +555,14 @@ export const Cart: React.FC<Props> = ({
 										<button
 											type="submit"
 											form="checkout-form" // Links to the form ID above
-											disabled={!canSubmit || isSubmitting || isCoolingDown}
-											className={`cursor-pointer w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting || isCoolingDown
+											disabled={!canSubmit || isSubmitting}
+											className={`cursor-pointer w-full bg-orange-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-orange-700 transition shadow-lg shadow-orange-200 flex items-center justify-center gap-2 ${!canSubmit || isSubmitting
 												? "opacity-70 cursor-not-allowed"
 												: ""
 												}`}
 										>
 											{isSubmitting ? (
 												<Loader2 size={20} className="animate-spin" />
-											) : isCoolingDown ? (
-												"Vui lòng đợi..."
 											) : (
 												"Xác nhận đặt hàng"
 											)}
