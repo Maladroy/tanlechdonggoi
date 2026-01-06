@@ -3,6 +3,7 @@ import type { Unsubscribe } from "firebase/firestore";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { ChatWidget } from "./components/ChatWidget";
 import { CouponDisplay } from "./components/CouponDisplay";
 import { AuthGate } from "./components/AuthGate";
 import { Cart } from "./components/Cart";
@@ -397,7 +398,13 @@ const App: React.FC = () => {
 		}
 	};
 
-	return <>{renderView()}</>;
+	return (
+		<>
+			{renderView()}
+			{/* Chat Widget - Show on all views except Admin */}
+			{view !== AppView.ADMIN && <ChatWidget />}
+		</>
+	);
 };
 
 export default App;
