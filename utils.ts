@@ -6,6 +6,53 @@ import type {
 } from "./types";
 
 /**
+ * Calculates the similarity between two strings using Levenshtein distance.
+ * Returns a value between 0 (no match) and 1 (perfect match).
+ */
+export function calculateSimilarity(s1: string, s2: string): number {
+	const longer = s1.length > s2.length ? s1 : s2;
+	const shorter = s1.length > s2.length ? s2 : s1;
+
+	if (longer.length === 0) {
+		return 1.0;
+	}
+
+	const dist = levenshteinDistance(longer, shorter);
+	return (longer.length - dist) / longer.length;
+}
+
+function levenshteinDistance(s1: string, s2: string): number {
+	const m = s1.length;
+	const n = s2.length;
+	const dp: number[][] = [];
+
+	for (let i = 0; i <= m; i++) {
+		dp[i] = [];
+		for (let j = 0; j <= n; j++) {
+			if (i === 0) {
+				dp[i][j] = j;
+			} else if (j === 0) {
+				dp[i][j] = i;
+			} else {
+				dp[i][j] = 0;
+			}
+		}
+	}
+
+	for (let i = 1; i <= m; i++) {
+		for (let j = 1; j <= n; j++) {
+			if (s1[i - 1].toLowerCase() === s2[j - 1].toLowerCase()) {
+				dp[i][j] = dp[i - 1][j - 1];
+			} else {
+				dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+			}
+		}
+	}
+
+	return dp[m][n];
+}
+
+/**
  * Strips markdown formatting from a string.
  */
 export function stripMarkdown(markdown: string): string {

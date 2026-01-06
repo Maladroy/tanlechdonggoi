@@ -1,6 +1,6 @@
 import { Flame, Percent, Plus, ShoppingCart, Tag } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Category, Combo, UserProfile } from "../types";
 import { stripMarkdown } from "../utils";
 import { PromoBanner } from "./PromoBanner";
@@ -33,6 +33,10 @@ export const Shop: React.FC<Props> = ({
     "default",
   );
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 30;
+
   const categoryOptions = useMemo(() => {
     const uniqueIds = new Set(
       combos.map((c) => c.category).filter(Boolean) as string[],
@@ -54,6 +58,18 @@ export const Shop: React.FC<Props> = ({
     }
     return result;
   }, [combos, selectedCategory, sortBy]);
+
+  // Reset pagination when filter changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, sortBy]);
+
+  const totalPages = Math.ceil(filteredCombos.length / ITEMS_PER_PAGE);
+  const paginatedCombos = filteredCombos.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -154,7 +170,7 @@ export const Shop: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredCombos.map((combo) => (
+          {paginatedCombos.map((combo) => (
             <div
               key={combo.id}
               className="relative bg-white rounded-3xl shadow-xl border border-gray-100 overflow-visible hover:shadow-2xl transition-all duration-300 group flex flex-col"
@@ -295,6 +311,31 @@ export const Shop: React.FC<Props> = ({
             </div>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-8">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-full bg-white border border-gray-200 disabled:opacity-50 hover:bg-gray-50 text-gray-700 font-medium transition shadow-sm"
+            >
+              Trước
+            </button>
+            <span className="text-sm font-medium text-gray-600 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 rounded-full bg-white border border-gray-200 disabled:opacity-50 hover:bg-gray-50 text-gray-700 font-medium transition shadow-sm"
+            >
+              Sau
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Footer */}

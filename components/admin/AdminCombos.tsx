@@ -1,4 +1,13 @@
-import { Edit, Plus, Trash2, XCircle } from "lucide-react";
+import {
+	CheckCircleIcon,
+	EyeSlashIcon,
+	NoSymbolIcon,
+	PencilSquareIcon,
+	PlusIcon,
+	TrashIcon,
+	XCircleIcon,
+	XMarkIcon,
+} from "@heroicons/react/24/outline";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -8,7 +17,7 @@ import {
 	updateCombo,
 } from "../../services/firebase";
 import type { Category, Combo, ComboStatus, VariantCombinationRule, VariantOption } from "../../types";
-import { ensureNewVariantFormat } from "../../utils";
+import { calculateSimilarity, ensureNewVariantFormat } from "../../utils";
 import MarkdownRenderer from "../MarkdownRenderer";
 import { CombinationRulesManager } from "./CombinationRulesManager";
 import { VariantManager } from "./VariantManager";
@@ -22,6 +31,17 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 	const [showAddCombo, setShowAddCombo] = useState(false);
 	const [editingComboId, setEditingComboId] = useState<string | null>(null);
 	const [categories, setCategories] = useState<Category[]>([]);
+	const [nameWarning, setNameWarning] = useState<{
+		type: "warning" | "soft";
+		message: string;
+	} | null>(null);
+
+	// Image Preview Modal State
+	const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+	// Pagination State
+	const [currentPage, setCurrentPage] = useState(1);
+	const ITEMS_PER_PAGE = 12;
 
 	const [newCombo, setNewCombo] = useState<Partial<Combo>>({
 		name: "",
@@ -45,6 +65,52 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 	useEffect(() => {
 		getCategories().then(setCategories);
 	}, []);
+
+	// Pagination Logic
+	const totalPages = Math.ceil(combos.length / ITEMS_PER_PAGE);
+	const currentCombos = combos.slice(
+		(currentPage - 1) * ITEMS_PER_PAGE,
+		currentPage * ITEMS_PER_PAGE,
+	);
+
+	const checkNameSimilarity = (name: string) => {
+		if (!name || name.trim() === "") {
+			setNameWarning(null);
+			return;
+		}
+
+		let maxSim = 0;
+		let similarName = "";
+
+		for (const combo of combos) {
+			// Skip self when editing
+			if (editingComboId && combo.id === editingComboId) continue;
+
+			const sim = calculateSimilarity(name, combo.name);
+			if (sim > maxSim) {
+				maxSim = sim;
+				similarName = combo.name;
+			}
+		}
+
+		if (maxSim >= 0.7) {
+			setNameWarning({
+				type: "warning",
+				message: `Cảnh báo: Tên sản phẩm quá giống "${similarName}" (${Math.round(
+					maxSim * 100,
+				)}%)`,
+			});
+		} else if (maxSim >= 0.4) {
+			setNameWarning({
+				type: "soft",
+				message: `Lưu ý: Tên sản phẩm có nét giống "${similarName}" (${Math.round(
+					maxSim * 100,
+				)}%)`,
+			});
+		} else {
+			setNameWarning(null);
+		}
+	};
 
 	const handleSaveCombo = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -95,6 +161,8 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 		setTempCombinationRules(combo.variantCombinationRules || []);
 		setEditingComboId(combo.id);
 		setShowAddCombo(true);
+		// Don't warn about name similarity when just opening edit for the existing name
+		setNameWarning(null);
 	};
 
 	const closeComboModal = () => {
@@ -118,12 +186,42 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 		setTagsInput("");
 		setTempVariants([]);
 		setTempCombinationRules([]);
+		setNameWarning(null);
 	};
 
 	const handleDeleteCombo = async (id: string) => {
 		if (confirm("Xóa combo này?")) {
 			await deleteCombo(id);
 			onRefresh();
+		}
+	};
+
+	const getStatusConfig = (status: ComboStatus) => {
+		switch (status) {
+			case "available":
+				return {
+					icon: <CheckCircleIcon className="w-4 h-4" />,
+					text: "Sẵn sàng",
+					className: "bg-green-50 text-green-700 border-green-100",
+				};
+			case "out_of_stock":
+				return {
+					icon: <NoSymbolIcon className="w-4 h-4" />,
+					text: "Hết hàng",
+					className: "bg-red-50 text-red-700 border-red-100",
+				};
+			case "hidden":
+				return {
+					icon: <EyeSlashIcon className="w-4 h-4" />,
+					text: "Ẩn",
+					className: "bg-gray-50 text-gray-600 border-gray-200",
+				};
+			default:
+				return {
+					icon: <CheckCircleIcon className="w-4 h-4" />,
+					text: "Sẵn sàng",
+					className: "bg-green-50 text-green-700 border-green-100",
+				};
 		}
 	};
 
@@ -136,7 +234,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 					onClick={() => setShowAddCombo(true)}
 					className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-700 transition shadow-sm"
 				>
-					<Plus size={20} /> Thêm Combo Mới
+					<PlusIcon className="w-5 h-5" /> Thêm Combo Mới
 				</button>
 			</div>
 
@@ -144,7 +242,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 				<table className="w-full text-left text-sm text-slate-600">
 					<thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
 						<tr>
-							<th className="p-4 w-16">Ảnh</th>
+							<th className="p-4 w-24">Ảnh</th>
 							<th className="p-4">Tên Combo</th>
 							<th className="p-4">Danh Mục</th>
 							<th className="p-4">Trạng thái</th>
@@ -153,77 +251,135 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-slate-100">
-						{combos.map((combo) => (
-							<tr key={combo.id} className="hover:bg-slate-50 group">
-								<td className="p-4">
-									<img
-										src={combo.imageUrl}
-										alt=""
-										className="w-10 h-10 object-cover rounded bg-slate-100"
-									/>
-								</td>
-								<td className="p-4">
-									<div className="font-bold text-slate-800">{combo.name}</div>
-									<div className="flex gap-1 mt-1 flex-wrap">
-										{combo.tags.map((tag) => (
-											<span
-												key={tag}
-												className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 border border-slate-200"
+						{currentCombos.map((combo) => {
+							const statusConfig = getStatusConfig(combo.status as ComboStatus);
+							return (
+								<tr key={combo.id} className="hover:bg-slate-50 group">
+									<td className="p-4">
+										<button
+											type="button"
+											className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shadow-sm relative group/img cursor-pointer block p-0"
+											onClick={() => setPreviewImage(combo.imageUrl)}
+										>
+											<img
+												src={combo.imageUrl}
+												alt=""
+												className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110"
+											/>
+										</button>
+									</td>
+									<td className="p-4 align-top">
+										<div className="font-bold text-slate-800 text-base mb-1 truncate max-w-[500px]" title={combo.name}>
+											{combo.name}
+										</div>
+										<div className="flex gap-1 flex-wrap">
+											{combo.tags.map((tag) => (
+												<span
+													key={tag}
+													className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-500 border border-slate-200 font-medium"
+												>
+													{tag}
+												</span>
+											))}
+										</div>
+									</td>
+									<td className="p-4 align-top">
+										<span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+											{categories.find((c) => c.id === combo.category)?.name ||
+												combo.category ||
+												"-"}
+										</span>
+									</td>
+									<td className="p-4 align-top">
+										<span
+											className={`flex items-center gap-1.5 w-fit text-xs font-bold px-2 py-1 rounded-full border ${statusConfig.className}`}
+										>
+											{statusConfig.icon}
+											{statusConfig.text}
+										</span>
+									</td>
+									<td className="p-4 text-right font-bold text-orange-600 align-top text-base">
+										{combo.price.toLocaleString()}đ
+									</td>
+									<td className="p-4 text-center align-top">
+										<div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+											<button
+												type="button"
+												onClick={() => openEditCombo(combo)}
+												className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+												title="Sửa"
 											>
-												{tag}
-											</span>
-										))}
-									</div>
-								</td>
-								<td className="p-4">
-									{categories.find((c) => c.id === combo.category)?.name ||
-										combo.category ||
-										"-"}
-								</td>
-								<td className="p-4">
-									<span
-										className={`text-xs font-bold px-2 py-1 rounded uppercase ${combo.status === "out_of_stock"
-											? "bg-red-100 text-red-700"
-											: combo.status === "hidden"
-												? "bg-gray-100 text-gray-600"
-												: "bg-green-100 text-green-700"
-											}`}
-									>
-										{combo.status === "out_of_stock"
-											? "Hết hàng"
-											: combo.status === "hidden"
-												? "Ẩn"
-												: "Sẵn sàng"}
-									</span>
-								</td>
-								<td className="p-4 text-right font-bold text-orange-600">
-									{combo.price.toLocaleString()}đ
-								</td>
-								<td className="p-4 text-center">
-									<div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-										<button
-											type="button"
-											onClick={() => openEditCombo(combo)}
-											className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-											title="Sửa"
-										>
-											<Edit size={16} />
-										</button>
-										<button
-											type="button"
-											onClick={() => handleDeleteCombo(combo.id)}
-											className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-											title="Xóa"
-										>
-											<Trash2 size={16} />
-										</button>
-									</div>
-								</td>
-							</tr>
-						))}
+												<PencilSquareIcon className="w-5 h-5" />
+											</button>
+											<button
+												type="button"
+												onClick={() => handleDeleteCombo(combo.id)}
+												className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+												title="Xóa"
+											>
+												<TrashIcon className="w-5 h-5" />
+											</button>
+										</div>
+									</td>
+								</tr>
+							);
+						})}
 					</tbody>
 				</table>
+
+				{/* Pagination Controls */}
+				{totalPages > 1 && (
+					<div className="flex justify-center items-center gap-2 p-4 bg-slate-50 border-t border-slate-200">
+						<button
+							type="button"
+							onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+							disabled={currentPage === 1}
+							className="px-3 py-1 rounded bg-white border border-slate-300 disabled:opacity-50 hover:bg-slate-50 text-slate-600"
+						>
+							Trước
+						</button>
+						<span className="text-sm font-medium text-slate-600">
+							Trang {currentPage} / {totalPages}
+						</span>
+						<button
+							type="button"
+							onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+							disabled={currentPage === totalPages}
+							className="px-3 py-1 rounded bg-white border border-slate-300 disabled:opacity-50 hover:bg-slate-50 text-slate-600"
+						>
+							Sau
+						</button>
+					</div>
+				)}
 			</div>
+
+			{/* Image Preview Modal */}
+			{previewImage && (
+				// biome-ignore lint/a11y/useKeyWithClickEvents: Modal backdrop click to close
+				// biome-ignore lint/a11y/noStaticElementInteractions: Modal backdrop click to close
+				<div
+					className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
+					onClick={() => setPreviewImage(null)}
+				>
+					<div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center">
+						{/* biome-ignore lint/a11y/useKeyWithClickEvents: Prevent click propagation */}
+						{/* biome-ignore lint/a11y/noStaticElementInteractions: Prevent click propagation */}
+						<img
+							src={previewImage}
+							alt="Preview"
+							className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-default"
+							onClick={(e) => e.stopPropagation()}
+						/>
+						<button
+							type="button"
+							onClick={() => setPreviewImage(null)}
+							className="absolute -top-4 -right-4 md:top-4 md:right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition backdrop-blur-md border border-white/20"
+						>
+							<XMarkIcon className="w-8 h-8" />
+						</button>
+					</div>
+				</div>
+			)}
 
 			{/* Add/Edit Combo Modal */}
 			{showAddCombo && (
@@ -236,7 +392,7 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 								onClick={closeComboModal}
 								className="text-slate-400 hover:text-slate-600"
 							>
-								<XCircle size={24} />
+								<XCircleIcon className="w-6 h-6" />
 							</button>
 						</h3>
 						<form onSubmit={handleSaveCombo} className="space-y-4">
@@ -251,12 +407,28 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 									<input
 										id="combo-name"
 										required
-										className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+										className={`w-full p-2 border rounded-lg focus:ring-2 focus:outline-none ${nameWarning?.type === "warning"
+											? "border-red-300 focus:ring-red-500 bg-red-50"
+											: nameWarning?.type === "soft"
+												? "border-yellow-300 focus:ring-yellow-500 bg-yellow-50"
+												: "border-slate-300 focus:ring-orange-500"
+											}`}
 										value={newCombo.name}
-										onChange={(e) =>
-											setNewCombo({ ...newCombo, name: e.target.value })
-										}
+										onChange={(e) => {
+											setNewCombo({ ...newCombo, name: e.target.value });
+											checkNameSimilarity(e.target.value);
+										}}
 									/>
+									{nameWarning && (
+										<p
+											className={`text-xs mt-1 font-medium ${nameWarning.type === "warning"
+												? "text-red-600"
+												: "text-yellow-600"
+												}`}
+										>
+											{nameWarning.message}
+										</p>
+									)}
 								</div>
 								<div className="w-1/3">
 									<label
