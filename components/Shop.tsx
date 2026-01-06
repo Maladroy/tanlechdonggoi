@@ -240,10 +240,6 @@ export const Shop: React.FC<Props> = ({
                     );
                   })}
                 </div>
-                {/* Sale Timer */}
-                {/* <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
-                  <Clock size={12} /> Flash Sale
-                </div> */}
               </div>
 
               <div className="p-5 flex-1 flex flex-col">
@@ -251,7 +247,7 @@ export const Shop: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => onViewProduct(combo)}
-                    className="font-bold text-xl text-gray-800 leading-snug group-hover:text-orange-600 transition text-left"
+                    className="font-bold lg:text-xl text-gray-800 leading-snug group-hover:text-orange-600 transition text-left"
                   >
                     {combo.name}
                   </button>
@@ -298,9 +294,10 @@ export const Shop: React.FC<Props> = ({
                         onAddToCart(combo);
                       }
                     }}
-                    className="cursor-pointer  bg-gray-900 hover:bg-orange-600 text-white pl-5 pr-4 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-2 group/btn"
+                    className="cursor-pointer bg-gray-900 hover:bg-orange-600 text-white px-3 py-2 md:pl-5 md:pr-4 md:py-3 rounded-xl font-bold text-sm md:text-base transition-all shadow-lg hover:shadow-orange-200 active:scale-95 flex items-center gap-1 md:gap-2 group/btn whitespace-nowrap"
                   >
-                    Thêm Vào Giỏ
+                    <span className="hidden xs:inline">Thêm</span>
+                    <span className="xs:hidden">Thêm</span> <span className="hidden sm:inline">Vào Giỏ</span>
                     <Plus
                       size={18}
                       className="group-hover/btn:rotate-90 transition"

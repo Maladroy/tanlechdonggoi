@@ -269,8 +269,14 @@ export const AdminCombos: React.FC<Props> = ({ combos, onRefresh }) => {
 										</button>
 									</td>
 									<td className="p-4 align-top">
-										<div className="font-bold text-slate-800 text-base mb-1 truncate max-w-[500px]" title={combo.name}>
-											{combo.name}
+										<div className="group/tooltip relative">
+											<div className="font-bold text-slate-800 text-base mb-1 truncate max-w-[500px]">
+												{combo.name}
+											</div>
+											<div className="absolute left-0 bottom-full mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-opacity delay-200 z-50 pointer-events-none bg-slate-800 text-white text-xs rounded-lg py-2 px-3 shadow-xl whitespace-normal min-w-[200px] max-w-[300px]">
+												{combo.name}
+												<div className="absolute left-4 top-full -mt-1 border-4 border-transparent border-t-slate-800" />
+											</div>
 										</div>
 										<div className="flex gap-1 flex-wrap">
 											{combo.tags.map((tag) => (

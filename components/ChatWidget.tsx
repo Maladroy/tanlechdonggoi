@@ -38,7 +38,7 @@ const ChatButton: React.FC<ChatButtonProps> = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             className={`
-                relative w-14 h-14 rounded-full shadow-lg
+                relative w-12 h-12 md:w-14 md:h-14 rounded-full shadow-lg
                 flex items-center justify-center
                 text-white transition-all duration-300 ease-out
                 hover:scale-110 hover:shadow-xl
@@ -114,13 +114,13 @@ export const ChatWidget: React.FC = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
+        <div className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 flex flex-col items-center gap-2">
             {/* Header Label */}
             <div
                 className={`
-                    bg-linear-to-r from-orange-500 to-red-500 
-                    text-white text-xs font-bold 
-                    px-3 py-1.5 rounded-full shadow-lg
+                    bg-gradient-to-r from-orange-500 to-red-500 
+                    text-white text-[10px] md:text-xs font-bold 
+                    px-2 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg
                     whitespace-nowrap
                     ${isShaking ? "animate-shake" : ""}
                 `}
